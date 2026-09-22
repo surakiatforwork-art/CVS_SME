@@ -1186,6 +1186,12 @@
       header{
         padding:calc(clamp(6px, 1.1dvh, 10px) + env(safe-area-inset-top)) var(--mobileSide) clamp(6px, 1.1dvh, 10px);
       }
+      body.map-open header{
+        height:25svh;
+        height:25dvh;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+      }
       .hdr{ gap:2.2vw; }
       .hdr + .hdr{ margin-top:7px; }
       .menu-btn{
