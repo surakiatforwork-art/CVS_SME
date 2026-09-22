@@ -1712,7 +1712,7 @@
 
   function reportTeamLine(){
     const sheetName = safeText(embedPrefillContext.sheetName).trim();
-    return sheetName ? `CVS: ${sheetName}` : TEAM_REPORT;
+    return sheetName || TEAM_REPORT;
   }
 
   function buildReportText(){
