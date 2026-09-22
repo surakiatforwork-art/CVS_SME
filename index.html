@@ -652,6 +652,11 @@
       color:#071915;
       min-width:0;
     }
+    .map-popup-body{
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
+    }
     .map-store-name{
       min-width:0;
       flex:1 1 auto;
@@ -2040,16 +2045,18 @@
   }
 
   var storeNamePeekPointerId = null;
+  var storeNamePeekPointerType = '';
 
   function hideStoreNamePeek_(){
     storeNamePeekPointerId = null;
+    storeNamePeekPointerType = '';
     var peek = $('storeNamePeek');
     if(!peek) return;
     peek.classList.remove('show', 'below');
     peek.setAttribute('aria-hidden', 'true');
   }
 
-  function showStoreNamePeek_(target, place, pointerId){
+  function showStoreNamePeek_(target, place, pointerId, pointerType){
     if(!target || !place) return;
     var peek = $('storeNamePeek');
     if(!peek) return;
@@ -2061,6 +2068,7 @@
     peek.style.top = (showBelow ? rect.bottom + 10 : rect.top - 8) + 'px';
     peek.setAttribute('aria-hidden', 'false');
     storeNamePeekPointerId = pointerId;
+    storeNamePeekPointerType = String(pointerType || '');
     requestAnimationFrame(function(){
       if(storeNamePeekPointerId !== pointerId) return;
       peek.classList.add('show');
@@ -3895,12 +3903,14 @@
       var lastTextMap = formatLastVisited(p.lastVisitedDate);
 
       var popup =
-        '<div class="map-store-title"><span class="map-store-name" data-id="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</span>' +
+        '<div class="map-popup-body" data-id="' + escapeHtml(p.id) + '">' +
+        '<div class="map-store-title"><span class="map-store-name">' + escapeHtml(p.name) + '</span>' +
           '<button class="map-copy-store" type="button" data-id="' + escapeHtml(p.id) + '" aria-label="คัดลอกข้อมูลร้าน" title="คัดลอกข้อมูลร้าน">⧉</button>' +
         '</div>' +
         '<div style="font-size:12px;color:#3b6760;margin-top:4px;">🗓️ ไปล่าสุด: ' + escapeHtml(lastTextMap) + '</div>' +
         (p.visited ? '<div style="font-size:12px;color:#64748b;margin-top:4px;font-weight:900;">ไปแล้ว</div>' : '') +
-        '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml;
+        '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml +
+        '</div>';
 
       var markerOptions = p.visited ? { icon: visitedIcon } : {};
       var mk = L.marker([p.lat, p.lng], markerOptions).addTo(placesLayer).bindPopup(popup, {
@@ -4515,31 +4525,35 @@
   }, true);
 
   document.addEventListener('pointerdown', function(ev){
-    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
-    if(!name) return;
-    var id = name.getAttribute('data-id');
+    var popup = ev.target && ev.target.closest ? ev.target.closest('.map-popup-body[data-id]') : null;
+    if(!popup || (ev.target && ev.target.closest && ev.target.closest('button, a'))) return;
+    var id = popup.getAttribute('data-id');
     var place = PLACES.find(function(x){ return String(x.id) === String(id); });
     if(!place) return;
     ev.preventDefault();
     ev.stopPropagation();
-    showStoreNamePeek_(name, place, ev.pointerId);
+    showStoreNamePeek_(popup, place, ev.pointerId, ev.pointerType);
   }, true);
 
   document.addEventListener('pointerup', function(ev){
     if(storeNamePeekPointerId === ev.pointerId) hideStoreNamePeek_();
   }, true);
   document.addEventListener('pointercancel', function(ev){
-    if(storeNamePeekPointerId === ev.pointerId) hideStoreNamePeek_();
+    // Android can dispatch pointercancel while a finger is still held on Leaflet.
+    if(storeNamePeekPointerId === ev.pointerId && storeNamePeekPointerType !== 'touch') hideStoreNamePeek_();
+  }, true);
+  document.addEventListener('touchend', function(){
+    if(storeNamePeekPointerType === 'touch') hideStoreNamePeek_();
   }, true);
   document.addEventListener('click', function(ev){
-    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
-    if(!name) return;
+    var popup = ev.target && ev.target.closest ? ev.target.closest('.map-popup-body[data-id]') : null;
+    if(!popup || (ev.target && ev.target.closest && ev.target.closest('button, a'))) return;
     ev.preventDefault();
     ev.stopPropagation();
   }, true);
   document.addEventListener('contextmenu', function(ev){
-    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
-    if(!name) return;
+    var popup = ev.target && ev.target.closest ? ev.target.closest('.map-popup-body[data-id]') : null;
+    if(!popup) return;
     ev.preventDefault();
     hideStoreNamePeek_();
   }, true);
