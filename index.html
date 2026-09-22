@@ -2561,9 +2561,21 @@
   // Keep manual refresh single-flight so repeated taps cannot stack API/GPS work.
   var REFRESH_PROMISE = null;
 
+  function routeSummaryPlaces_(){
+    var route = $('routeFilter') ? String($('routeFilter').value || '') : '';
+    if(!route) return PLACES;
+    return PLACES.filter(function(place){
+      return String((place && place.route) || '') === route;
+    });
+  }
+
   function renderTopStats(){
+    var summaryPlaces = routeSummaryPlaces_();
+    var total = summaryPlaces.length;
+    var visited = summaryPlaces.filter(function(place){ return !!(place && place.visited); }).length;
+    var remaining = Math.max(0, total - visited);
     $('titleStats').textContent =
-      'ทั้งหมด ' + META.total + ' | เหลือ ' + META.remaining + ' | ไปแล้ว ' + META.visited;
+      'ทั้งหมด ' + total + ' | เหลือ ' + remaining + ' | ไปแล้ว ' + visited;
     $('badgeText').textContent = (META.total ? ('เหลือ ' + META.remaining + '/' + META.total) : 'กำลังโหลด…');
   }
 
