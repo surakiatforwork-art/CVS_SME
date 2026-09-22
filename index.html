@@ -510,7 +510,8 @@
     .map-history-fab:active{ transform:scale(.96); }
 
     body.map-open main{
-      height: calc(100vh - var(--hdrH) - var(--tabsH));
+      height: calc(100svh - var(--hdrH) - var(--tabsH));
+      height: calc(100dvh - var(--hdrH) - var(--tabsH));
       overflow:hidden;
       padding-bottom: 14px;
     }
@@ -1178,9 +1179,12 @@
     }
 
     @media (max-width: 720px){
-      :root{ --bottomTabsH:72px; }
+      :root{
+        --bottomTabsH:clamp(64px, 8dvh, 76px);
+        --mobileSide:clamp(10px, 3vw, 18px);
+      }
       header{
-        padding:calc(8px + env(safe-area-inset-top)) 3% 8px;
+        padding:calc(clamp(6px, 1.1dvh, 10px) + env(safe-area-inset-top)) var(--mobileSide) clamp(6px, 1.1dvh, 10px);
       }
       .hdr{ gap:2.2vw; }
       .hdr + .hdr{ margin-top:7px; }
@@ -1202,7 +1206,7 @@
       }
       .pickrow{
         display:grid;
-        grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns:repeat(3, minmax(0, 1fr));
         gap:2.2vw;
       }
       .pickrow .sheetpick,
@@ -1210,10 +1214,11 @@
       .pickrow .routepick{
         width:100%;
       }
-      .pickrow .routepick{ grid-column:1 / -1; }
+      .pickrow .routepick{ grid-column:auto; }
       .sheetbtn{
-        padding:9px 3vw;
-        font-size:clamp(12px, 3.5vw, 14px);
+        min-height:clamp(42px, 5.5dvh, 48px);
+        padding:8px 2vw;
+        font-size:clamp(11px, 2.8vw, 14px);
       }
       .sheetdrop,
       .sortpick .sheetdrop,
@@ -1225,12 +1230,12 @@
         width:94%;
         max-height:min(58dvh, calc(100dvh - var(--hdrH) - var(--tabsH) - 12px));
       }
-      main{ width:94%; }
+      main{ width:calc(100% - (var(--mobileSide) * 2)); }
       .map-h{
-        padding:10px 3%;
+        padding:clamp(8px, 1.4dvh, 12px) var(--mobileSide);
         gap:8px;
       }
-      .map-h strong{ width:100%; }
+      body.map-open .map-h strong{ display:none; }
       .pills{
         width:100%;
         margin-left:0;
@@ -1245,15 +1250,53 @@
         overflow:hidden;
         text-overflow:ellipsis;
       }
-      #map{ height:clamp(320px, 61dvh, 680px); min-height:0; }
-      /* Keep the FAB above the fixed tabs on short and tall mobile screens. */
+      #map{ height:clamp(280px, 58dvh, 720px); min-height:0; }
+      body.map-open #map{ min-height:0; }
       .map-history-fab{
-        right:12px;
-        bottom:calc(var(--tabsH) + clamp(12px, 2.4dvh, 22px));
-        min-height:48px;
-        padding:9px 12px;
+        right:var(--mobileSide);
+        bottom:clamp(12px, 2.4dvh, 22px);
+        min-height:clamp(44px, 5.6dvh, 52px);
+        padding:8px 12px;
+      }
+      body.map-popup-open .map-history-fab{ display:none; }
+      .leaflet-popup{ max-width:calc(100vw - (var(--mobileSide) * 2)); }
+      .leaflet-popup-content-wrapper{
+        max-height:min(42svh, 390px);
+        max-height:min(42dvh, 390px);
+        overflow-y:auto;
+        border-radius:16px;
+      }
+      .leaflet-popup-content{
+        width:auto !important;
+        min-width:min(280px, calc(100vw - (var(--mobileSide) * 4)));
+        margin:12px;
+      }
+      .map-actions{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:6px;
+      }
+      .map-actions .map-link{
+        min-height:40px;
+        padding:8px 4px;
+        font-size:clamp(11px, 2.9vw, 13px);
+      }
+      .map-edit-actions{
+        gap:6px;
+        margin-top:8px;
+      }
+      .map-edit-actions .map-link{
+        flex:1 1 0;
+        min-height:36px;
+        padding:7px 6px;
+        font-size:clamp(11px, 2.8vw, 13px);
       }
       .bottom-tabs .row{ width:94%; }
+    }
+
+    @media (max-width: 430px){
+      .pickrow{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
+      .pickrow .routepick{ grid-column:1 / -1; }
     }
 
     @media (max-width: 390px){
@@ -2385,6 +2428,8 @@
 
       map.on('dragstart', function(){ mapState.userInteracted = true; });
       map.on('zoomstart', function(){ mapState.userInteracted = true; });
+      map.on('popupopen', function(){ document.body.classList.add('map-popup-open'); });
+      map.on('popupclose', function(){ document.body.classList.remove('map-popup-open'); });
       map.on('moveend zoomend', function(){
         try{
           var c = map.getCenter();
