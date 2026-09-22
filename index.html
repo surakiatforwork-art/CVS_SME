@@ -1215,6 +1215,62 @@
         height:25dvh;
         overflow:visible;
       }
+      body.map-open .hdr + .hdr{ margin-top:clamp(2px, .45dvh, 4px); }
+      body.map-open .menu-btn{
+        min-width:38px;
+        min-height:32px;
+        border-radius:12px;
+        font-size:16px;
+      }
+      body.map-open .title{ font-size:clamp(12px, 3.5vw, 15px); }
+      body.map-open .topbar .rightbox{ gap:1vw; }
+      body.map-open .badge{
+        min-height:30px;
+        padding:3px 1.5vw;
+        font-size:clamp(10px, 2.8vw, 12px);
+      }
+      body.map-open .icon-btn{
+        width:28px;
+        min-width:28px;
+        height:28px;
+        min-height:28px;
+        border-radius:10px;
+        font-size:14px;
+      }
+      body.map-open .sync-btn{
+        min-height:28px;
+        padding:0 6px;
+        border-radius:10px;
+        font-size:11px;
+      }
+      body.map-open .btn-map{
+        min-height:32px;
+        padding:5px 1.8vw;
+        border-radius:12px;
+        font-size:clamp(10px, 2.8vw, 12px);
+      }
+      body.map-open .tstats{
+        padding:3px 8px;
+        font-size:clamp(10px, 2.8vw, 12px);
+        line-height:1.1;
+      }
+      body.map-open .controls{
+        margin-top:clamp(2px, .45dvh, 4px);
+        gap:1.6vw;
+      }
+      body.map-open .sheetbtn{
+        min-height:34px;
+        padding:5px 1.5vw;
+        border-radius:12px;
+        font-size:clamp(10px, 2.8vw, 12px);
+      }
+      body.map-open .search{
+        min-height:34px;
+        gap:7px;
+        padding:5px 9px;
+        border-radius:12px;
+      }
+      body.map-open .search input{ font-size:clamp(12px, 3.2vw, 14px); }
       .hdr{ gap:2.2vw; }
       .hdr + .hdr{ margin-top:7px; }
       .menu-btn{
