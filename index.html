@@ -608,10 +608,15 @@
       cursor:pointer;
     }
     .map-actions{
-      display:flex;
-      gap:10px;
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:6px;
       margin-top:8px;
-      flex-wrap:wrap;
+    }
+    .map-actions .map-link{
+      min-height:38px;
+      padding:8px 5px;
+      font-size:12px;
     }
     .map-actions .map-link:active{ transform:scale(.99); }
     .map-edit-actions{
@@ -622,10 +627,10 @@
     }
     .map-edit-actions .map-link{
       width:auto;
-      min-height:32px;
-      padding:6px 9px;
+      min-height:30px;
+      padding:5px 8px;
       border-radius:10px;
-      font-size:12px;
+      font-size:11px;
     }
     .map-edit{
       border-color:rgba(7,25,21,.16);
@@ -638,6 +643,14 @@
       gap:6px;
       font-weight:1000;
       color:#071915;
+      min-width:0;
+    }
+    .map-store-name{
+      min-width:0;
+      flex:1 1 auto;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
     }
     .map-copy-store{
       width:26px;
@@ -654,6 +667,10 @@
       flex:0 0 auto;
     }
     .map-copy-store:active{ transform:scale(.94); }
+    .leaflet-popup-content{
+      width:min(320px, calc(100vw - 48px)) !important;
+      margin:10px 12px;
+    }
     .marker-visited{
       filter:grayscale(1);
       opacity:.72;
@@ -1286,7 +1303,7 @@
         border-radius:16px;
       }
       .leaflet-popup-content{
-        width:auto !important;
+        width:min(320px, calc(100vw - (var(--mobileSide) * 4))) !important;
         min-width:min(280px, calc(100vw - (var(--mobileSide) * 4)));
         margin:12px;
       }
@@ -1306,7 +1323,7 @@
       }
       .map-edit-actions .map-link{
         flex:1 1 0;
-        min-height:36px;
+        min-height:32px;
         padding:7px 6px;
         font-size:clamp(11px, 2.8vw, 13px);
       }
@@ -3715,7 +3732,7 @@
       var lastTextMap = formatLastVisited(p.lastVisitedDate);
 
       var popup =
-        '<div class="map-store-title">[' + escapeHtml(p.id) + '] ' + escapeHtml(p.name) +
+        '<div class="map-store-title"><span class="map-store-name">[' + escapeHtml(p.id) + '] ' + escapeHtml(p.name) + '</span>' +
           '<button class="map-copy-store" type="button" data-id="' + escapeHtml(p.id) + '" aria-label="คัดลอกข้อมูลร้าน" title="คัดลอกข้อมูลร้าน">⧉</button>' +
         '</div>' +
         '<div style="font-size:12px;color:#3b6760;margin-top:4px;">🗓️ ไปล่าสุด: ' + escapeHtml(lastTextMap) + '</div>' +
@@ -3723,7 +3740,10 @@
         '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml;
 
       var markerOptions = p.visited ? { icon: visitedIcon } : {};
-      var mk = L.marker([p.lat, p.lng], markerOptions).addTo(placesLayer).bindPopup(popup);
+      var mk = L.marker([p.lat, p.lng], markerOptions).addTo(placesLayer).bindPopup(popup, {
+        closeButton:false,
+        closeOnClick:true
+      });
       markerById.set(String(p.id), mk);
     });
 
