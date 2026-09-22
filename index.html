@@ -631,6 +631,28 @@
       background:rgba(7,25,21,.04);
       color:#315b55;
     }
+    .map-store-title{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-weight:1000;
+      color:#071915;
+    }
+    .map-copy-store{
+      width:26px;
+      height:26px;
+      padding:0;
+      border:1px solid rgba(7,25,21,.14);
+      border-radius:8px;
+      background:rgba(7,25,21,.05);
+      color:#315b55;
+      font:inherit;
+      font-size:15px;
+      line-height:1;
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .map-copy-store:active{ transform:scale(.94); }
     .marker-visited{
       filter:grayscale(1);
       opacity:.72;
@@ -1809,6 +1831,35 @@
     var url = apiUrl('saveNoted', params);
     if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
     return await jsonp(url, 30000);
+  }
+
+  function storeCopyText_(place){
+    if(!place) return '';
+    var account = String(place.account || '').trim();
+    var accountName = String(place.account_name || '').trim();
+    var number = String(place.number || '').trim();
+    var name = String(place.name || '').trim();
+    if(accountName) return [account, accountName].filter(Boolean).join(' ');
+    return [account, number, name].filter(Boolean).join(' ');
+  }
+
+  async function copyText_(text){
+    text = String(text || '').trim();
+    if(!text) throw new Error('ไม่มีข้อมูลร้านให้คัดลอก');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    var field = document.createElement('textarea');
+    field.value = text;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    var copied = document.execCommand('copy');
+    field.remove();
+    if(!copied) throw new Error('คัดลอกไม่สำเร็จ');
   }
 
   async function apiUpdateRoute(id, route, sheetName){
@@ -3600,7 +3651,9 @@
       var lastTextMap = formatLastVisited(p.lastVisitedDate);
 
       var popup =
-        '<div style="font-weight:1000;color:#071915">[' + escapeHtml(p.id) + '] ' + escapeHtml(p.name) + '</div>' +
+        '<div class="map-store-title">[' + escapeHtml(p.id) + '] ' + escapeHtml(p.name) +
+          '<button class="map-copy-store" type="button" data-id="' + escapeHtml(p.id) + '" aria-label="คัดลอกข้อมูลร้าน" title="คัดลอกข้อมูลร้าน">⧉</button>' +
+        '</div>' +
         '<div style="font-size:12px;color:#3b6760;margin-top:4px;">🗓️ ไปล่าสุด: ' + escapeHtml(lastTextMap) + '</div>' +
         (p.visited ? '<div style="font-size:12px;color:#64748b;margin-top:4px;font-weight:900;">ไปแล้ว</div>' : '') +
         '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml;
@@ -4193,6 +4246,25 @@
     try{ if(map) map.closePopup(); }catch(e){}
     if(btn.classList.contains('map-edit-route')) openRouteEditor(place);
     else openLocationEditor(place);
+  }, true);
+
+  document.addEventListener('click', async function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.map-copy-store') : null;
+    if(!btn) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+    var id = btn.getAttribute('data-id');
+    var place = PLACES.find(function(x){ return String(x.id) === String(id); });
+    if(!place){ showToast('ไม่พบข้อมูลร้านสำหรับคัดลอก'); return; }
+
+    try{
+      await copyText_(storeCopyText_(place));
+      showToast('คัดลอกข้อมูลร้านแล้ว');
+    }catch(err){
+      console.error(err);
+      showToast(err && err.message ? err.message : 'คัดลอกไม่สำเร็จ');
+    }
   }, true);
 
   function requestGPS(){
