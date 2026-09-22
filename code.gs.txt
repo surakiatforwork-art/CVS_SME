@@ -1,0 +1,604 @@
+const CONFIG = {
+  SPREADSHEET_ID: '',
+  SHEET_NAME: 'DB_GBKK4',
+  HEADER_ROW: 1,
+  DATA_START_ROW: 2,
+  VISITED_TRUE: 1,
+  VISITED_FALSE: 0,
+  CACHE_TTL_SEC: 300,
+  CACHE_CHUNK_CHARS: 25000,
+  REV_PROP_KEY: 'GBKK4_REV_V1',
+  TIMEZONE: 'Asia/Bangkok',
+  LAST_VISITED_HEADER: 'lastVisitedDate',
+  NOTED_HEADER: 'noted',
+  PLACES_SCHEMA_VERSION: 3,
+};
+
+function doGet(e) {
+  try {
+    const p = (e && e.parameter) ? e.parameter : {};
+    const actionRaw = (p.action === undefined || p.action === null) ? '' : String(p.action);
+    const action = actionRaw.trim() || 'getPlaces';
+    const callback = String(p.callback || '').trim();
+
+    let result;
+    switch (action) {
+      case 'getSheets':
+        result = api_getSheets_();
+        break;
+      case 'getPlaces':
+        result = api_getPlaces_(p.sheet);
+        break;
+      case 'markVisited':
+        result = api_markVisited_(p.id, p.sheet);
+        break;
+      case 'resetVisitedAll':
+        result = api_resetVisitedAll_(p.sheet);
+        break;
+      case 'saveNoted':
+        result = api_saveNoted_(p.id, p.noted, p.sheet);
+        break;
+      default:
+        result = { ok: false, message: 'Unknown action: ' + action };
+        break;
+    }
+
+    return output_(result, callback);
+  } catch (err) {
+    const msg = (err && err.message) ? err.message : String(err);
+    const cb = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback) : '';
+    return output_({ ok: false, message: msg }, cb);
+  }
+}
+
+function output_(obj, callback) {
+  const json = JSON.stringify(obj);
+  if (callback) {
+    const safeCb = callback.replace(/[^\w.$]/g, '');
+    return ContentService.createTextOutput(`${safeCb}(${json});`)
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function api_getSheets_() {
+  const ss = getSpreadsheet_();
+  const sheets = getUsableSheetNames_(ss);
+  const def = (sheets.indexOf(CONFIG.SHEET_NAME) !== -1) ? CONFIG.SHEET_NAME : ((sheets && sheets.length) ? sheets[0] : CONFIG.SHEET_NAME);
+  return { ok: true, defaultSheet: def, sheets };
+}
+
+function api_getPlaces_(sheetParam) {
+  const info = getSheetWithName_(sheetParam);
+  const sheet = info.sheet;
+  const sheetName = info.sheetName;
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  const rev = getRev_(sheetName);
+
+  if (lastRow < CONFIG.DATA_START_ROW) {
+    return { ok: true, rev, total: 0, visited: 0, remaining: 0, places: [] };
+  }
+
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'places_v3_' + sheetName + '_rev_' + rev;
+  const cached = getChunkedCache_(cache, cacheKey);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.ok) return parsed;
+    } catch (_) {}
+  }
+
+  const headerMap = getHeaderMap_(sheet, lastCol);
+
+  const colList = mustCol_(headerMap, ['list', 'id']);
+  const colName = mustCol_(headerMap, ['name']);
+  const colLocation = mustCol_(headerMap, ['location', 'latlng', 'lat_lng']);
+  const colMaps = mustCol_(headerMap, ['google_maps', 'googlemaps', 'google map', 'maps', 'map']);
+
+  const colVisited = pickCol_(headerMap, ['visited', 'visit', 'done']);
+  const colLastVisitedDate = pickCol_(headerMap, ['lastvisiteddate', 'last_visited_date', 'lastvisited', 'visited_date', 'visiteddate', 'last_visit_date']);
+
+  const colAccount = pickCol_(headerMap, ['account']);
+  const colNumber = pickCol_(headerMap, ['number', 'branch', 'branch_number', 'store_no']);
+  const colAccountName = pickCol_(headerMap, ['account_name', 'accountname', 'store_name', 'branch_name']);
+  const colNoted = pickCol_(headerMap, ['noted']);
+  const colRoute = pickCol_(headerMap, ['route', 'route_no', 'route_number', 'routeno', 'รูท', 'เส้นทาง']);
+
+  const maxNeedCol = Math.max(
+    colList,
+    colName,
+    colLocation,
+    colMaps,
+    colVisited || 0,
+    colLastVisitedDate || 0,
+    colAccount || 0,
+    colNumber || 0,
+    colAccountName || 0,
+    colNoted || 0,
+    colRoute || 0
+  );
+
+  const numRows = lastRow - CONFIG.HEADER_ROW;
+  const values = sheet.getRange(CONFIG.HEADER_ROW + 1, 1, numRows, maxNeedCol).getValues();
+
+  const places = [];
+  let total = 0;
+  let visitedCount = 0;
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+
+    const id = safeStr_(row[colList - 1]);
+    const name = safeStr_(row[colName - 1]);
+    if (!id || !name) continue;
+
+    total++;
+
+    const visitedVal = colVisited ? row[colVisited - 1] : 0;
+    const isVisited = toVisitedBool_(visitedVal);
+
+    if (isVisited) visitedCount++;
+
+    const locText = safeStr_(row[colLocation - 1]);
+    const ll = parseLatLng_(locText);
+
+    const mapsUrl = safeStr_(row[colMaps - 1]);
+
+    const account = colAccount ? safeStr_(row[colAccount - 1]) : '';
+    const number = colNumber ? safeStr_(row[colNumber - 1]) : '';
+    const account_name = colAccountName ? safeStr_(row[colAccountName - 1]) : '';
+    const noted = colNoted ? safeStr_(row[colNoted - 1]) : '';
+    const route = colRoute ? safeStr_(row[colRoute - 1]) : '';
+
+    const lastVisitedDate = colLastVisitedDate ? toYMD_(row[colLastVisitedDate - 1]) : '';
+
+    places.push({
+      id,
+      name,
+      lat: ll ? ll.lat : null,
+      lng: ll ? ll.lng : null,
+      mapsUrl: mapsUrl || '',
+      account,
+      number,
+      account_name,
+      noted: noted || '',
+      route: route || '',
+      visited: isVisited,
+      lastVisitedDate: lastVisitedDate || '',
+    });
+  }
+
+  const result = {
+    ok: true,
+    schemaVersion: CONFIG.PLACES_SCHEMA_VERSION,
+    rev,
+    total,
+    visited: visitedCount,
+    remaining: total - visitedCount,
+    places,
+  };
+
+  const json = JSON.stringify(result);
+  putChunkedCache_(cache, cacheKey, json, CONFIG.CACHE_TTL_SEC);
+
+  return result;
+}
+
+function rowCacheKey_(sheetName, rev, id) {
+  return 'place_row_v1_' + Utilities.base64EncodeWebSafe(JSON.stringify([String(sheetName), Number(rev), String(id)]));
+}
+
+function findRowById_(sheet, sheetName, idColumn, startRow, numRows, rev, id) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = rowCacheKey_(sheetName, rev, id);
+  const cachedRow = parseInt(cache.get(cacheKey) || '0', 10);
+  const lastRow = startRow + numRows - 1;
+
+  if (cachedRow >= startRow && cachedRow <= lastRow) {
+    const cachedId = safeStr_(sheet.getRange(cachedRow, idColumn).getValue());
+    if (cachedId && cachedId.toLowerCase() === String(id).toLowerCase()) return cachedRow;
+  }
+
+  const idRange = sheet.getRange(startRow, idColumn, numRows, 1);
+  const cell = idRange.createTextFinder(id).matchEntireCell(true).matchCase(false).findNext();
+  if (!cell) return 0;
+
+  const rowIndex = cell.getRow();
+  try { cache.put(cacheKey, String(rowIndex), CONFIG.CACHE_TTL_SEC); } catch (_) {}
+  return rowIndex;
+}
+
+function api_markVisited_(idParam, sheetParam) {
+  const id = safeStr_(idParam);
+  if (!id) return { ok: false, message: 'Missing id' };
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  }
+
+  try {
+    const info = getSheetWithName_(sheetParam);
+    const sheet = info.sheet;
+    const sheetName = info.sheetName;
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow < CONFIG.DATA_START_ROW) {
+      return { ok: false, message: 'No data rows' };
+    }
+
+    const headerMap = getHeaderMap_(sheet, lastCol);
+    const colList = mustCol_(headerMap, ['list', 'id']);
+    const colVisited = mustCol_(headerMap, ['visited', 'visit', 'done']);
+    const colLastVisitedDate = ensureLastVisitedDateCol_(sheet, headerMap, lastCol);
+
+    const numRows = lastRow - CONFIG.HEADER_ROW;
+    const startRow = CONFIG.HEADER_ROW + 1;
+    const oldRev = getRev_(sheetName);
+
+    const rowIndex = findRowById_(sheet, sheetName, colList, startRow, numRows, oldRev, id);
+    if (!rowIndex) return { ok: false, message: 'ID not found: ' + id };
+    const visitedCell = sheet.getRange(rowIndex, colVisited);
+    const lastDateCell = sheet.getRange(rowIndex, colLastVisitedDate);
+
+    const curVisitedVal = visitedCell.getValue();
+    const isVisited = toVisitedBool_(curVisitedVal);
+
+    const todayYMD = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd');
+    const curLast = toYMD_(lastDateCell.getValue());
+
+    if (isVisited && curLast === todayYMD) {
+      return { ok: true, id, rev: oldRev, lastVisitedDate: todayYMD, message: 'Already visited' };
+    }
+
+    visitedCell.setValue(CONFIG.VISITED_TRUE);
+    lastDateCell.setValue(todayYMD);
+
+    const rev = bumpRev_(sheetName);
+    removeChunkedCache_(CacheService.getScriptCache(), 'places_v3_' + sheetName + '_rev_' + oldRev);
+
+    return { ok: true, id, rev, lastVisitedDate: todayYMD, message: isVisited ? 'Updated visited date' : 'Marked visited' };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
+function api_resetVisitedAll_(sheetParam) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  }
+
+  try {
+    const info = getSheetWithName_(sheetParam);
+    const sheet = info.sheet;
+    const sheetName = info.sheetName;
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow < CONFIG.DATA_START_ROW) {
+      return { ok: true, rev: getRev_(sheetName), message: 'No data rows to reset' };
+    }
+
+    const headerMap = getHeaderMap_(sheet, lastCol);
+    const colVisited = mustCol_(headerMap, ['visited', 'visit', 'done']);
+
+    const numRows = lastRow - CONFIG.HEADER_ROW;
+    const startRow = CONFIG.HEADER_ROW + 1;
+
+    const oldRev = getRev_(sheetName);
+
+    const colRange = sheet.getRange(startRow, colVisited, numRows, 1);
+    const reset = Array.from({ length: numRows }, () => [CONFIG.VISITED_FALSE]);
+    colRange.setValues(reset);
+
+    const rev = bumpRev_(sheetName);
+    removeChunkedCache_(CacheService.getScriptCache(), 'places_v3_' + sheetName + '_rev_' + oldRev);
+
+    return { ok: true, rev, message: 'Reset visited all' };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
+function api_saveNoted_(idParam, notedParam, sheetParam) {
+  const id = safeStr_(idParam);
+  if (!id) return { ok: false, message: 'Missing id' };
+  if (notedParam === undefined || notedParam === null) {
+    return { ok: false, message: 'Missing noted' };
+  }
+
+  const noted = String(notedParam); // frontend sends JSON string
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  }
+
+  try {
+    const info = getSheetWithName_(sheetParam);
+    const sheet = info.sheet;
+    const sheetName = info.sheetName;
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow < CONFIG.DATA_START_ROW) {
+      return { ok: false, message: 'No data rows' };
+    }
+
+    const headerMap = getHeaderMap_(sheet, lastCol);
+    const colList = mustCol_(headerMap, ['list', 'id']);
+    const colNoted = ensureNotedCol_(sheet, headerMap, lastCol);
+
+    const numRows = lastRow - CONFIG.HEADER_ROW;
+    const startRow = CONFIG.HEADER_ROW + 1;
+    const oldRev = getRev_(sheetName);
+
+    const rowIndex = findRowById_(sheet, sheetName, colList, startRow, numRows, oldRev, id);
+    if (!rowIndex) return { ok: false, message: 'ID not found: ' + id };
+    const notedCell = sheet.getRange(rowIndex, colNoted);
+
+    const current = notedCell.getValue();
+    const currentStr = (current === null || current === undefined) ? '' : String(current);
+
+    if (currentStr === noted) {
+      return { ok: true, id, rev: oldRev, message: 'Noted unchanged' };
+    }
+
+    notedCell.setValue(noted);
+
+    const rev = bumpRev_(sheetName);
+    removeChunkedCache_(CacheService.getScriptCache(), 'places_v3_' + sheetName + '_rev_' + oldRev);
+
+    return { ok: true, id, rev, message: 'Saved noted' };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
+function ensureLastVisitedDateCol_(sheet, headerMap, lastCol) {
+  const aliases = ['lastvisiteddate', 'last_visited_date', 'lastvisited', 'visited_date', 'visiteddate', 'last_visit_date'];
+  let col = pickCol_(headerMap, aliases);
+  if (col) return col;
+  const newCol = lastCol + 1;
+  sheet.getRange(CONFIG.HEADER_ROW, newCol).setValue(CONFIG.LAST_VISITED_HEADER);
+  headerMap[normHeader_(CONFIG.LAST_VISITED_HEADER)] = newCol;
+  return newCol;
+}
+
+function getChunkedCache_(cache, cacheKey) {
+  try {
+    const direct = cache.get(cacheKey);
+    if (direct) return direct;
+
+    const partCount = parseInt(cache.get(cacheKey + '_parts') || '0', 10);
+    if (!isFinite(partCount) || partCount < 1) return null;
+
+    const parts = [];
+    for (let i = 0; i < partCount; i++) {
+      const part = cache.get(cacheKey + '_part_' + i);
+      if (part === null) return null;
+      parts.push(part);
+    }
+    return parts.join('');
+  } catch (_) {
+    return null;
+  }
+}
+
+function putChunkedCache_(cache, cacheKey, value, ttlSec) {
+  try {
+    const chunkSize = CONFIG.CACHE_CHUNK_CHARS;
+    const partCount = Math.ceil(value.length / chunkSize);
+    for (let i = 0; i < partCount; i++) {
+      cache.put(cacheKey + '_part_' + i, value.slice(i * chunkSize, (i + 1) * chunkSize), ttlSec);
+    }
+    cache.put(cacheKey + '_parts', String(partCount), ttlSec);
+  } catch (_) {
+    // Cache is an optimization; a cache quota error must not break the API response.
+  }
+}
+
+function removeChunkedCache_(cache, cacheKey) {
+  try {
+    const partCount = parseInt(cache.get(cacheKey + '_parts') || '0', 10);
+    const keys = [cacheKey, cacheKey + '_parts'];
+    if (isFinite(partCount) && partCount > 0) {
+      for (let i = 0; i < partCount; i++) keys.push(cacheKey + '_part_' + i);
+    }
+    cache.removeAll(keys);
+  } catch (_) {}
+}
+
+function ensureNotedCol_(sheet, headerMap, lastCol) {
+  const aliases = ['noted'];
+  let col = pickCol_(headerMap, aliases);
+  if (col) return col;
+  const newCol = lastCol + 1;
+  sheet.getRange(CONFIG.HEADER_ROW, newCol).setValue(CONFIG.NOTED_HEADER);
+  headerMap[normHeader_(CONFIG.NOTED_HEADER)] = newCol;
+  return newCol;
+}
+
+function toYMD_(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return Utilities.formatDate(v, CONFIG.TIMEZONE, 'yyyy-MM-dd');
+  const s = safeStr_(v);
+  if (!s) return '';
+  const m1 = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (m1) {
+    const y = m1[1];
+    const mo = String(m1[2]).padStart(2, '0');
+    const d = String(m1[3]).padStart(2, '0');
+    return `${y}-${mo}-${d}`;
+  }
+  const t = Date.parse(s);
+  if (isFinite(t)) return Utilities.formatDate(new Date(t), CONFIG.TIMEZONE, 'yyyy-MM-dd');
+  return s;
+}
+
+function getSpreadsheet_() {
+  let ss;
+
+  if (CONFIG.SPREADSHEET_ID && CONFIG.SPREADSHEET_ID.trim()) {
+    ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID.trim());
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('ไม่พบ Active Spreadsheet (ถ้าเป็น standalone ให้ใส่ CONFIG.SPREADSHEET_ID)');
+  }
+
+  return ss;
+}
+
+function getSheetWithName_(sheetParam) {
+  const ss = getSpreadsheet_();
+  const sheetName = resolveSheetName_(sheetParam, ss);
+  const sh = ss.getSheetByName(sheetName);
+  if (!sh) throw new Error('ไม่พบชีท: ' + sheetName);
+  return { ss, sheet: sh, sheetName };
+}
+
+function resolveSheetName_(sheetParam, ss) {
+  const requestedRaw = safeStr_(sheetParam);
+  const requested = requestedRaw || CONFIG.SHEET_NAME;
+
+  const allowed = getUsableSheetNames_(ss);
+  if (allowed.indexOf(requested) !== -1) return requested;
+
+  if (!requestedRaw) {
+    if (allowed.indexOf(CONFIG.SHEET_NAME) !== -1) return CONFIG.SHEET_NAME;
+    if (allowed && allowed.length) return allowed[0];
+    throw new Error('ไม่พบชีทที่ใช้งานได้');
+  }
+
+  throw new Error('ไม่อนุญาตให้ใช้ชีท: ' + requested);
+}
+
+function getUsableSheetNames_(ss) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'usable_sheets_' + (CONFIG.SPREADSHEET_ID && CONFIG.SPREADSHEET_ID.trim() ? CONFIG.SPREADSHEET_ID.trim() : 'active');
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try {
+      const arr = JSON.parse(cached);
+      if (Array.isArray(arr)) return arr;
+    } catch (_) {}
+  }
+
+  const sheets = ss.getSheets();
+  const out = [];
+
+  for (let i = 0; i < sheets.length; i++) {
+    const sh = sheets[i];
+    try {
+      if (sh.isSheetHidden && sh.isSheetHidden()) continue;
+
+      const lastCol = sh.getLastColumn();
+      if (lastCol < 1) continue;
+
+      const headerMap = getHeaderMap_(sh, lastCol);
+
+      const colList = pickCol_(headerMap, ['list', 'id']);
+      const colName = pickCol_(headerMap, ['name']);
+      const colLocation = pickCol_(headerMap, ['location', 'latlng', 'lat_lng']);
+      const colMaps = pickCol_(headerMap, ['google_maps', 'googlemaps', 'google map', 'maps', 'map']);
+      const colVisited = pickCol_(headerMap, ['visited', 'visit', 'done']);
+
+      if (colList && colName && colLocation && colMaps && colVisited) {
+        out.push(sh.getName());
+      }
+    } catch (_) {}
+  }
+
+  cache.put(cacheKey, JSON.stringify(out), 300);
+  return out;
+}
+
+function getHeaderMap_(sheet, lastCol) {
+  const headers = sheet.getRange(CONFIG.HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  const map = {};
+  for (let c = 0; c < headers.length; c++) {
+    const key = normHeader_(headers[c]);
+    if (!key) continue;
+    if (!map[key]) map[key] = c + 1;
+  }
+  return map;
+}
+
+function normHeader_(v) {
+  const s = safeStr_(v).trim().toLowerCase();
+  if (!s) return '';
+  return s
+    .replace(/\u200b/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^\wก-๙_]/g, '');
+}
+
+function pickCol_(headerMap, aliases) {
+  for (let i = 0; i < aliases.length; i++) {
+    const k = normHeader_(aliases[i]);
+    if (headerMap[k]) return headerMap[k];
+  }
+  return 0;
+}
+
+function mustCol_(headerMap, aliases) {
+  const col = pickCol_(headerMap, aliases);
+  if (!col) throw new Error('ไม่พบคอลัมน์ที่จำเป็น: ' + aliases.join(' / '));
+  return col;
+}
+
+function safeStr_(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim();
+}
+
+function toVisitedBool_(v) {
+  if (typeof v === 'boolean') return v;
+  const s = safeStr_(v).toLowerCase();
+  if (!s) return false;
+  return (s === '1' || s === 'true' || s === 'yes' || s === 'y' || s === 'done' || s === 'visited');
+}
+
+function parseLatLng_(text) {
+  const s = safeStr_(text);
+  if (!s) return null;
+
+  const m = s.match(/-?\d+(?:\.\d+)?/g);
+  if (!m || m.length < 2) return null;
+
+  const lat = parseFloat(m[0]);
+  const lng = parseFloat(m[1]);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+
+  return { lat, lng };
+}
+
+function revKey_(sheetName) {
+  const sh = safeStr_(sheetName);
+  if (!sh || sh === CONFIG.SHEET_NAME) return CONFIG.REV_PROP_KEY;
+  const keySafe = sh.replace(/[^\wก-๙]/g, '_');
+  return CONFIG.REV_PROP_KEY + '_' + keySafe;
+}
+
+function getRev_(sheetName) {
+  const props = PropertiesService.getScriptProperties();
+  const cur = parseInt(props.getProperty(revKey_(sheetName)) || '1', 10);
+  return isFinite(cur) && cur > 0 ? cur : 1;
+}
+
+function bumpRev_(sheetName) {
+  const props = PropertiesService.getScriptProperties();
+  const cur = getRev_(sheetName);
+  const next = cur + 1;
+  props.setProperty(revKey_(sheetName), String(next));
+  return next;
+}
