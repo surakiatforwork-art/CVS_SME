@@ -1,0 +1,3003 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title></title>
+
+  <!-- Leaflet (คงไว้ตามเดิม) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- (Optional) JSZip for fallback ZIP (จะใช้เฉพาะถ้า File System Access API ไม่มี) -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#000;
+      --panel: rgba(18,18,18,.88);
+      --panel2: rgba(255,255,255,.06);
+      --line: rgba(255,255,255,.12);
+      --text:#e8e8e8;
+      --muted: rgba(255,255,255,.72);
+      --muted2: rgba(255,255,255,.55);
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+
+      --safeB: env(safe-area-inset-bottom);
+      --safeT: env(safe-area-inset-top);
+
+      /* sizes (percent-first) */
+      --icon: clamp(20px, 6vw, 28px);
+      --iconBtn: clamp(38px, 11vw, 52px);
+      --shutter: clamp(62px, 18vw, 86px);
+      --thumb: clamp(52px, 16vw, 74px);
+      --radius: 18px;
+
+      /* Viewfinder bias up */
+      --vfTopPad: clamp(6px, 1.8vh, 16px);
+      --vfLift: clamp(10px, 2.2vh, 26px);
+
+      /* ✅ Viewfinder base aspect: "4:3 แนวตั้ง" = 3/4 */
+      --vfAspect: 3 / 4;
+
+      /* spacing */
+      --padX: clamp(10px, 3vw, 16px);
+      --gapY: clamp(10px, 2vh, 14px);
+    }
+
+    *{ box-sizing:border-box; }
+
+    /* ✅ ล็อกทั้งแอปไม่ให้เกิด scroll แนวตั้ง/แนวนอน 100% */
+    html,body{
+      height:100%;
+      overflow: hidden;
+      overscroll-behavior: none;   /* กัน elastic/bounce */
+      max-width: 100vw;
+      max-height: 100dvh;
+    }
+
+    body{
+      margin:0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
+      overflow:hidden;
+      width: 100vw;
+      height: 100dvh;
+      touch-action: manipulation; /* ลด gesture scroll ไม่จำเป็น */
+    }
+
+    button, input, select{
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* ===== App Layout ===== */
+    .app{
+      height:100dvh;
+      width: 100vw;
+      max-width: 100vw;
+      overflow: hidden;            /* ✅ กัน page ขยาย/เลื่อน */
+      display:grid;
+      grid-template-rows: auto 1fr auto;
+      padding-top: var(--safeT);
+      padding-bottom: var(--safeB);
+    }
+
+    /* ===== Top Bar ===== */
+    .topbar{
+      height: clamp(48px, 7.5vh, 64px);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 0 var(--padX);
+      gap: 10px;
+      flex: 0 0 auto;
+      max-width: 100vw;
+      overflow: hidden;            /* ✅ กันขยายแนวนอน */
+      min-width: 0;
+    }
+    .topbar .left,
+    .topbar .right{
+      display:flex;
+      align-items:center;
+      gap: clamp(8px, 2.6vw, 14px);
+      min-width: 0;                /* ✅ สำคัญ: กัน flex item ดันกว้าง */
+    }
+    .topbar .right{ justify-content:flex-end; }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width: 0;
+    }
+    .brand .title{
+      font-weight: 900;
+      letter-spacing:.2px;
+      font-size: clamp(12px, 3.4vw, 15px);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      color: rgba(255,255,255,.92);
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: clamp(11px, 3.2vw, 13px);
+      white-space:nowrap;
+      min-width: 0;
+    }
+
+    .iconBtn{
+      width: var(--iconBtn);
+      height: var(--iconBtn);
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      flex: 0 0 auto;
+    }
+    .iconBtn:active{ transform: translateY(1px); }
+    .iconBtn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    svg{ width: var(--icon); height: var(--icon); fill: currentColor; }
+
+    /* ===== ✅ Camera Toggle (แทนปุ่ม 3 ขีดซ้ายบน) ===== */
+    .camToggle{
+      width: calc(var(--iconBtn) + 42px);
+      height: var(--iconBtn);
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      padding: 4px;
+      gap: 6px;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      flex: 0 0 auto;
+      position: relative;
+      overflow:hidden;
+    }
+    .camToggle:active{ transform: translateY(1px); }
+    .camToggle[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .camToggle .track{
+      position:absolute;
+      inset: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .camToggle .knob{
+      position: relative;
+      z-index: 1;
+      width: calc(var(--iconBtn) - 9px);
+      height: calc(var(--iconBtn) - 9px);
+      border-radius: 999px;
+      display:grid;
+      place-items:center;
+      font-size: clamp(16px, 5vw, 22px);
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      transform: translateX(0);
+      transition: transform .14s ease, background .14s ease, border-color .14s ease;
+      will-change: transform;
+    }
+    .camToggle.on .knob{
+      transform: translateX(calc(var(--iconBtn) - 6px));
+      background: rgba(16,185,129,.18);
+      border-color: rgba(16,185,129,.35);
+    }
+    .camToggle .hintMini{
+      position: relative;
+      z-index: 1;
+      font-size: 11px;
+      font-weight: 900;
+      color: rgba(255,255,255,.70);
+      letter-spacing:.2px;
+      white-space:nowrap;
+      margin-left: calc(var(--iconBtn) - 6px);
+      display:none; /* ไม่ให้รก */
+    }
+
+    /* ===== Stage: เอาให้ Viewfinder ใหญ่สุด ===== */
+    .stage{
+      position:relative;
+      padding: var(--vfTopPad) var(--padX) 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform: translateY(calc(-1 * var(--vfLift)));
+      min-height: 0;               /* ✅ ป้องกัน grid ดัน overflow */
+      overflow: hidden;            /* ✅ กันเกิด scroll */
+      max-width: 100vw;
+      min-width: 0;
+    }
+
+    .viewWrap{
+      width: 100%;
+      height: 100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height: 0;
+      min-width: 0;                /* ✅ กันคอนเทนต์ดัน */
+      overflow: hidden;            /* ✅ */
+    }
+
+    .viewfinder{
+      width: 100%;
+      max-width: min(100vw, 980px);
+      max-height: 100%;
+      aspect-ratio: var(--vfAspect);
+      border-radius: calc(var(--radius) + 6px);
+      overflow:hidden;
+      background: #000;
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
+      position:relative;
+    }
+
+    video{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      background:#000;
+      display:block;
+      transform: none;
+    }
+    video.mirror{
+      transform: scaleX(-1);
+    }
+
+    .vfOverlay{
+      position:absolute;
+      inset: 0;
+      pointer-events:none;
+      display:flex;
+      align-items:flex-start;
+      justify-content:flex-start;
+      padding: clamp(10px, 3vw, 14px);
+      color: rgba(255,255,255,.9);
+      font-size: clamp(12px, 3.4vw, 14px);
+      text-shadow: 0 2px 12px rgba(0,0,0,.8);
+      min-width: 0;
+    }
+    .vfOverlay .hint{
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 8px 10px;
+      border-radius: 14px;
+      max-width: 88%;
+      line-height: 1.25;
+      min-width: 0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* ✅ Preset frame guide (ปรับตาม preset) */
+    .presetGuide{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      display:none;
+    }
+    .presetGuide.show{ display:block; }
+
+    .mask{
+      position:absolute;
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(1px);
+    }
+    .guideFrame{
+      position:absolute;
+      border: 2px solid rgba(255,255,255,.65);
+      border-radius: 14px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.35) inset;
+    }
+    .guideLabel{
+      position:absolute;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.40);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+      font-size: clamp(11px, 3.1vw, 13px);
+      font-weight: 900;
+      left: 12px;
+      bottom: 12px;
+      max-width: 80%;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* ===== Bottom Controls ===== */
+    .controls{
+      padding: 10px var(--padX) calc(10px + var(--safeB));
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+      align-items:center;
+      flex: 0 0 auto;
+      min-height: 0;
+      max-width: 100vw;
+      overflow: hidden;            /* ✅ ไม่ให้ controls ทำให้หน้า scroll */
+      min-width: 0;
+    }
+
+    /* ✅ ย้าย meta+gallery มาไว้ล่าง เพื่อไม่ให้บีบ viewfinder */
+    .metaBar{
+      width: 100%;
+      max-width: 980px;
+      min-width: 0;
+      display:grid;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: calc(var(--radius) + 2px);
+      border: 1px solid var(--line);
+      background: rgba(18,18,18,.72);
+      backdrop-filter: blur(10px);
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+    .metaRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      flex-wrap:wrap;
+      min-width: 0;
+    }
+    .metaLeft{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .metaRight{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+    .labelSmall{
+      font-size: clamp(11px, 3.1vw, 13px);
+      color: var(--muted2);
+      font-weight: 800;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      flex: 0 0 auto;
+    }
+    .valueSmall{
+      font-size: clamp(12px, 3.4vw, 14px);
+      color: rgba(255,255,255,.92);
+      font-weight: 850;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 62vw;
+      min-width: 0;
+    }
+
+    .switch{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      user-select:none;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .switch input{
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      flex: 0 0 auto;
+    }
+    .switch span{
+      font-size: clamp(12px, 3.3vw, 14px);
+      font-weight: 850;
+      color: rgba(255,255,255,.9);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      min-width: 0;
+    }
+
+    .dtInput{
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      font-size: clamp(13px, 3.6vw, 15px);
+      outline: none;
+      min-width: 0;
+    }
+    .dtInput:focus{
+      border-color: rgba(16,185,129,.55);
+      box-shadow: 0 0 0 4px rgba(16,185,129,.18);
+    }
+
+    /* ✅ Gallery strip: เลื่อนซ้าย-ขวาได้เฉพาะตรงนี้ */
+    .gallery{
+      width: 100%;
+      max-width: 980px;
+      min-width: 0;
+      display:flex;
+      align-items:center;
+      gap: 10px;
+
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
+
+      height: calc(var(--thumb) + 12px);
+      max-height: calc(var(--thumb) + 12px);
+
+      padding: 6px 2px;
+      scrollbar-width: none;
+      scroll-snap-type: x proximity;
+      flex: 0 0 auto;
+
+      overscroll-behavior-x: contain;
+      overscroll-behavior-y: none;
+    }
+    .gallery::-webkit-scrollbar{ display:none; }
+
+    .thumb{
+      width: var(--thumb);
+      min-width: var(--thumb);
+      height: var(--thumb);
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      overflow:hidden;
+      position:relative;
+      flex: 0 0 auto;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+
+      scroll-snap-align: start;
+    }
+    .thumb img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      display:block;
+    }
+    .thumb .idx{
+      position:absolute;
+      left: 7px;
+      top: 7px;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.12);
+      color: rgba(255,255,255,.92);
+      pointer-events:none;
+    }
+    .thumb .del{
+      position:absolute;
+      right: 6px;
+      top: 6px;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.45);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      pointer-events:auto;
+    }
+    .thumb .del svg{ width: 16px; height: 16px; }
+
+    /* Bottom main row (DeleteAll / Shutter / SwitchCam) */
+    .ctrlRow{
+      width: 100%;
+      max-width: 980px;
+      min-width: 0;
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items:center;
+      gap: 10px;
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+
+    .actionBtn{
+      width: var(--iconBtn);
+      height: var(--iconBtn);
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      justify-self:start;
+      flex: 0 0 auto;
+    }
+    .actionBtn:active{ transform: translateY(1px); }
+    .actionBtn.danger{
+      background: rgba(239,68,68,.10);
+      border-color: rgba(239,68,68,.25);
+      color: rgba(255,255,255,.92);
+    }
+    .actionBtn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .shutter{
+      width: var(--shutter);
+      height: var(--shutter);
+      border-radius: 999px;
+      border: 3px solid rgba(255,255,255,.85);
+      background: rgba(255,255,255,.08);
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      display:grid;
+      place-items:center;
+      position:relative;
+      flex: 0 0 auto;
+    }
+    .shutter::after{
+      content:"";
+      width: calc(var(--shutter) * .72);
+      height: calc(var(--shutter) * .72);
+      border-radius: 999px;
+      background: rgba(255,255,255,.88);
+      opacity: .92;
+      transform: scale(.92);
+      transition: transform .08s ease;
+    }
+    .shutter:active::after{ transform: scale(.88); }
+    .shutter[disabled]{ opacity:.45; cursor:not-allowed; }
+
+    .rightSlot{
+      justify-self:end;
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: calc(170px + var(--safeB));
+      transform: translateX(-50%);
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(18,18,18,.85);
+      color: rgba(255,255,255,.92);
+      font-size: 13px;
+      font-weight: 800;
+      display:none;
+      z-index: 80;
+      max-width: 90vw;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* ===== Modals (Settings / Preview / Map) ===== */
+    .backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.68);
+      display:none;
+      align-items: stretch;
+      justify-content: center;
+      z-index: 100;
+      padding: calc(10px + var(--safeT)) 10px calc(10px + var(--safeB));
+      overflow: hidden;
+    }
+    .modal{
+      width: min(900px, 100%);
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(14,14,14,.96);
+      box-shadow: 0 22px 80px rgba(0,0,0,.55);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-height: 0;
+    }
+    .modalHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      gap:10px;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+    .modalHeader .hTitle{
+      font-weight: 950;
+      letter-spacing:.2px;
+      font-size: 14px;
+      color: rgba(255,255,255,.92);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .modalBody{
+      padding: 12px;
+      overflow:auto;
+      display:grid;
+      gap: 12px;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .modalFooter{
+      padding: 12px;
+      display:flex;
+      gap: 10px;
+      justify-content:flex-end;
+      border-top: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      flex: 0 0 auto;
+    }
+
+    .btn{
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      font-weight: 900;
+      font-size: 14px;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{
+      background: linear-gradient(135deg, rgba(16,185,129,.95), rgba(16,185,129,.70));
+      border-color: rgba(16,185,129,.35);
+      color: #052e22;
+    }
+    .btn.danger{
+      background: rgba(239,68,68,.12);
+      border-color: rgba(239,68,68,.30);
+    }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+
+    .card{
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      border-radius: 18px;
+      padding: 12px;
+      display:grid;
+      gap: 10px;
+      min-width: 0;
+    }
+    .card .label{
+      font-size: 12px;
+      font-weight: 950;
+      color: rgba(255,255,255,.86);
+      letter-spacing:.2px;
+    }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 720px){ .grid2{ grid-template-columns: 1fr; } }
+
+    select.field, input.field{
+      width:100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      padding: 10px 12px;
+      font-size: 14px;
+      outline:none;
+      min-width: 0;
+    }
+    select.field:focus, input.field:focus{
+      border-color: rgba(16,185,129,.55);
+      box-shadow: 0 0 0 4px rgba(16,185,129,.18);
+    }
+    .mini{
+      font-size: 12px;
+      color: rgba(255,255,255,.62);
+      line-height:1.35;
+      min-width: 0;
+    }
+
+    /* Preview */
+    .previewCanvas{
+      width:100%;
+      height:auto;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background:#000;
+      display:block;
+    }
+    .seg{
+      display:flex;
+      gap: 8px;
+      flex-wrap:wrap;
+    }
+    .seg button{
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      padding: 8px 10px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+    }
+    .seg button.on{
+      border-color: rgba(16,185,129,.42);
+      background: rgba(16,185,129,.14);
+      color: rgba(255,255,255,.95);
+    }
+
+    /* Map */
+    #map{
+      width:100%;
+      height: 54vh;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+      background:#000;
+    }
+
+    pre{
+      margin:0;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
+      color: rgba(255,255,255,.88);
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 42vh;
+      overflow:auto;
+    }
+
+    #fileInput{ display:none; }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="left">
+        <!-- ✅ เปลี่ยนจากปุ่ม 3 ขีด -> Toggle เปิด/ปิดกล้อง -->
+        <button class="camToggle" id="btnCamToggle" title="Camera On/Off" aria-pressed="true">
+          <div class="track" aria-hidden="true"></div>
+          <div class="knob" id="camToggleKnob" aria-hidden="true">📷</div>
+          <div class="hintMini" aria-hidden="true">CAM</div>
+        </button>
+
+        <div class="brand">
+          <div class="title"></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <button class="iconBtn" id="btnTorch" title="Torch" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10v2l-3 6v4.5l2.2 2.2c.5.5.8 1.2.8 1.9V22H7v-3.4c0-.7.3-1.4.8-1.9L10 14.5V10L7 4V2zm2.2 20h5.6v-2.8c0-.2-.1-.4-.2-.6L12.4 16H11.6l-2.2 2.6c-.1.2-.2.4-.2.6V22z"/></svg>
+        </button>
+
+        <button class="iconBtn" id="btnImport" title="Import">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7v12H5V7h14zm0-2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H6l2.5-4.5z"/></svg>
+        </button>
+
+        <button class="iconBtn" id="btnDownloadAll" title="Download All" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v2H5v-2zM12 2l5.5 5.5-1.4 1.4L13 5.8V16h-2V5.8L7.9 8.9 6.5 7.5 12 2z"/></svg>
+        </button>
+
+        <button class="iconBtn" id="btnSettings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14,12.94a7.49,7.49,0,0,0,.05-.94,7.49,7.49,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.63l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.28,7.28,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.78,1H11.22a.5.5,0,0,0-.49.42L10.35,4.07a7.28,7.28,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.63L5.86,11.06a7.49,7.49,0,0,0-.05.94,7.49,7.49,0,0,0,.05.94L3.75,14.59a.5.5,0,0,0-.12.63l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.28,7.28,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.42h1.56a.5.5,0,0,0,.49-.42l.38-2.65a7.28,7.28,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.63ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stage (ใหญ่สุด) -->
+    <div class="stage">
+      <div class="viewWrap">
+        <div class="viewfinder" id="viewfinder">
+          <video id="camVideo" playsinline autoplay muted></video>
+
+          <div class="presetGuide" id="presetGuide" aria-hidden="true">
+            <div class="mask" id="maskTop"></div>
+            <div class="mask" id="maskBottom"></div>
+            <div class="mask" id="maskLeft"></div>
+            <div class="mask" id="maskRight"></div>
+            <div class="guideFrame" id="guideFrame"></div>
+            <div class="guideLabel" id="guideLabel"></div>
+          </div>
+
+          <div class="vfOverlay">
+            <div class="hint" id="vfHint">กำลังเปิดกล้อง… (ต้องอนุญาตกล้อง และเปิดผ่าน HTTPS / GitHub Pages)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div class="controls">
+      <!-- Main Time controls (อยู่หน้าหลัก + ยังมีใน Settings) -->
+      <div class="metaBar">
+        <div class="metaRow">
+          <div class="metaLeft">
+            <div class="labelSmall">เวลา</div>
+            <div class="valueSmall" id="timeSummary">-</div>
+          </div>
+          <div class="metaRight">
+            <label class="switch" title="Use current time">
+              <input id="useNowMain" type="checkbox" />
+              <span>ใช้เวลาปัจจุบัน</span>
+            </label>
+          </div>
+        </div>
+        <input id="customTimeMain" class="dtInput" type="datetime-local" />
+        <div class="metaRow">
+          <div class="metaLeft">
+            <div class="labelSmall">ตำแหน่ง</div>
+            <div class="valueSmall" id="locSummary">ปิดใช้งานตำแหน่ง</div>
+          </div>
+          <div class="metaRight">
+            <span class="pill" id="photoCountPill">0 รูป</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gallery (แนวนอนเลื่อนซ้าย-ขวา เท่านั้น) -->
+      <div class="gallery" id="gallery"></div>
+
+      <!-- Bottom row -->
+      <div class="ctrlRow">
+        <!-- ✅ Delete All อยู่มุมล่างซ้าย -->
+        <button class="actionBtn danger" id="btnDeleteAll" title="Delete All" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2zM4 7h16v2H4V7z"/></svg>
+        </button>
+
+        <button class="shutter" id="btnShutter" title="Shutter"></button>
+
+        <div class="rightSlot">
+          <button class="actionBtn" id="btnSwitchCam" title="Switch Camera" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5h-3.17l-1.83-2H9L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 14c-2.76 0-5-2.24-5-5h2.2l-2.7-2.7L3.8 14H6c0 3.31 2.69 6 6 6v-1.6l2.7 2.7L12 24v-5zM18 10h-2c0-3.31-2.69-6-6-6V5.6L7.3 2.9 10 0v5c2.76 0 5 2.24 5 5h-2.2l2.7 2.7L20.2 10H18z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden File Input -->
+  <input id="fileInput" type="file" accept="image/*" multiple />
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Preview Modal -->
+  <div class="backdrop" id="previewBackdrop" aria-hidden="true">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="hTitle">
+          <span id="previewTitle">Preview</span>
+        </div>
+        <button class="iconBtn" id="btnClosePreview" title="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+        </button>
+      </div>
+      <div class="modalBody">
+        <canvas id="previewCanvas" class="previewCanvas" width="1280" height="720"></canvas>
+
+        <div class="card">
+          <div class="label">เวลา (ต่อรูปนี้)</div>
+          <div class="seg">
+            <button id="photoTimeNow" type="button">ใช้เวลาปัจจุบัน</button>
+            <button id="photoTimeCustom" type="button">เลือกเวลาเอง</button>
+          </div>
+          <input id="photoCustomTime" class="field" type="datetime-local" />
+          <div class="mini" id="photoTimeHint">ค่าเริ่มต้นมาจาก “หน้าหลัก” ตอนถ่าย/นำเข้า แต่แก้เฉพาะรูปนี้ได้</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Download รูปนี้</div>
+          <div class="grid2">
+            <div>
+              <div class="mini">ชนิดไฟล์</div>
+              <select id="dlType" class="field">
+                <option value="image/jpeg">JPG</option>
+                <option value="image/png">PNG</option>
+              </select>
+            </div>
+            <div>
+              <div class="mini">JPG quality (0.70 - 1.00)</div>
+              <input id="dlQuality" class="field" type="number" min="0.7" max="1" step="0.01" value="0.95" />
+            </div>
+          </div>
+
+          <div class="grid2">
+            <button class="btn primary" id="btnDownloadOne">Download</button>
+            <button class="btn danger" id="btnDeleteOne">Delete รูปนี้</button>
+          </div>
+
+          <div class="mini" id="previewStatus">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="backdrop" id="settingsBackdrop" aria-hidden="true">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="hTitle">Settings</div>
+        <button class="iconBtn" id="btnCloseSettings" title="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+        </button>
+      </div>
+
+      <div class="modalBody">
+        <div class="card">
+          <div class="label">เวลา (Global) — มีบนหน้าหลักด้วย</div>
+          <div class="grid2">
+            <label class="switch">
+              <input id="useNow" type="checkbox" />
+              <span>ใช้เวลาปัจจุบัน</span>
+            </label>
+            <div>
+              <div class="mini">เลือกเวลาเอง (เมื่อปิดใช้เวลาปัจจุบัน)</div>
+              <input id="customTime" class="field" type="datetime-local" />
+            </div>
+          </div>
+          <div class="mini" id="timeStatus">-</div>
+        </div>
+
+        <div class="card">
+          <div class="label">รูปแบบ Timestamp (ค่าเริ่มต้น = Thai verbose + GMT)</div>
+          <select id="timeFormat" class="field">
+            <option value="thaiVerboseGmt" selected>ไทยแบบยาว + GMT+07:00 (ค่าเริ่มต้น)</option>
+            <option value="isoLike">YYYY-MM-DD HH:mm:ss</option>
+          </select>
+          <div class="mini">โหมด 2: จะโชว์ 2 บรรทัด พร้อม label “Network:” และ “Local:”</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Output & Preset Size (แนวตั้งเท่านั้น)</div>
+          <div class="grid2">
+            <div>
+              <div class="mini">โหมดขนาดส่งออก</div>
+              <select id="outputMode" class="field">
+                <option value="preset" selected>Preset (เลือกขนาด)</option>
+                <option value="original">Original (ขนาดรูปเดิม)</option>
+              </select>
+            </div>
+            <div>
+              <div class="mini">Fit Mode (ไม่ยืดภาพ)</div>
+              <select id="fitMode" class="field">
+                <option value="contain" selected>Contain (มีขอบดำ)</option>
+                <option value="cover">Cover (ครอปเต็มเฟรม)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div class="mini">Preset Size (Portrait)</div>
+            <select id="outputSize" class="field">
+              <option value="1080x2340" selected>1080 × 2340</option>
+              <option value="1080x2160">1080 × 2160</option>
+              <option value="1080x1920">1080 × 1920</option>
+              <option value="1200x1600">1200 × 1600</option>
+              <option value="1440x1920">1440 × 1920</option>
+              <option value="960x1280">960 × 1280</option>
+              <option value="720x1560">720 × 1560</option>
+              <option value="720x1440">720 × 1440</option>
+              <option value="720x1280">720 × 1280</option>
+              <option value="800x1200">800 × 1200</option>
+              <option value="480x640">480 × 640</option>
+              <option value="360x640">360 × 640</option>
+              <option value="240x320">240 × 320</option>
+            </select>
+            <div class="mini" id="outStatus">-</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Overlay (ไม่มีแถบพื้นดำ — ใช้ stroke/shadow เท่านั้น)</div>
+          <div class="grid2">
+            <div>
+              <div class="mini">ตำแหน่ง Overlay</div>
+              <select id="overlayPos" class="field">
+                <option value="tr" selected>ขวาบน</option>
+                <option value="tl">ซ้ายบน</option>
+                <option value="br">ขวาล่าง</option>
+                <option value="bl">ซ้ายล่าง</option>
+              </select>
+            </div>
+            <div>
+              <div class="mini">ระยะขอบ (padding)</div>
+              <input id="overlayPad" class="field" type="number" min="8" max="120" step="1" value="24" />
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div>
+              <div class="mini">Auto font scale (%)</div>
+              <input id="fontScale" class="field" type="number" min="50" max="250" step="5" value="100" />
+            </div>
+            <div>
+              <div class="mini">Fixed px (ถ้าไม่ใช้ Auto)</div>
+              <input id="fontPx" class="field" type="number" min="10" max="220" step="1" value="32" />
+            </div>
+          </div>
+
+          <label class="switch">
+            <input id="fontAuto" type="checkbox" checked />
+            <span>Auto (สเกลตาม Output)</span>
+          </label>
+
+          <div class="mini">ข้อความจะวาดด้วย stroke + shadow เพื่ออ่านง่าย (ไม่ใช้พื้นหลังดำ)</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Location (Nominatim / OSM)</div>
+          <div class="grid2">
+            <label class="switch">
+              <input id="enableLocation" type="checkbox" />
+              <span>เปิดใช้งานตำแหน่ง (Overlay)</span>
+            </label>
+            <div class="grid2" style="gap:10px">
+              <label class="switch">
+                <input id="showLatLng" type="checkbox" checked />
+                <span>แสดง Lat/Lng</span>
+              </label>
+              <label class="switch">
+                <input id="showAddress" type="checkbox" checked />
+                <span>แสดงที่อยู่</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <button class="btn" id="btnUseGPS">ใช้พิกัดปัจจุบัน (GPS)</button>
+            <button class="btn" id="btnOpenMap">เลือกบนแผนที่</button>
+          </div>
+
+          <div class="grid2">
+            <input id="lat" class="field" type="number" step="any" placeholder="Lat เช่น 13.7563" />
+            <input id="lng" class="field" type="number" step="any" placeholder="Lng เช่น 100.5018" />
+          </div>
+
+          <div class="grid2">
+            <input id="placeQuery" class="field" placeholder="ค้นหาสถานที่ เช่น CentralWorld" />
+            <button class="btn" id="btnSearchPlace">ค้นหา</button>
+          </div>
+
+          <div class="mini" id="locStatus">ปิดใช้งานตำแหน่ง</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Log panel</div>
+          <label class="switch">
+            <input id="enableLogPanel" type="checkbox" />
+            <span>เปิดแสดง Log</span>
+          </label>
+          <div class="grid2">
+            <button class="btn" id="btnCopyLog">Copy Log</button>
+            <button class="btn danger" id="btnClearLog">Clear Log</button>
+          </div>
+          <pre id="logPre"></pre>
+          <div class="mini">ถ้ากล้อง/โหลดรูปมีปัญหา ให้เปิด Log แล้วส่งข้อความในนี้</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Danger zone</div>
+          <div class="grid2">
+            <button class="btn danger" id="btnResetSettings">Reset Settings</button>
+            <button class="btn danger" id="btnDeleteAllInSettings">Delete All Photos</button>
+          </div>
+          <div class="mini">Delete All จะลบรูปออกจริง ๆ (และ Download All จะไม่นับรูปที่ลบแล้ว)</div>
+        </div>
+      </div>
+
+      <div class="modalFooter">
+        <button class="btn" id="btnCloseSettings2">Close</button>
+        <button class="btn primary" id="btnSaveSettings">Apply / Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Modal -->
+  <div class="backdrop" id="mapBackdrop" aria-hidden="true">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="hTitle">Map (Tap to pick)</div>
+        <button class="iconBtn" id="btnCloseMap" title="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>
+        </button>
+      </div>
+      <div class="modalBody">
+        <div id="map"></div>
+        <div class="grid2">
+          <button class="btn primary" id="btnConfirmMap">Confirm</button>
+          <button class="btn danger" id="btnCancelMap">Cancel</button>
+        </div>
+        <div class="mini" id="mapHint">แตะบนแผนที่เพื่อเลือกพิกัด</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(async () => {
+  "use strict";
+
+  const SETTINGS_KEY = "PT_TS_SETTINGS_V2_4";
+
+  /* ✅ เพิ่ม IndexedDB เพื่อเก็บรูปแบบ local (ปิดแอป/รีบูต/เปิดแท็บใหม่/เปิดจาก shortcut แล้วยังอยู่) */
+  const IDB_NAME = "PT_TS_DB_V1";
+  const IDB_VERSION = 1;
+  const STORE_PHOTOS = "photos";
+
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE_PHOTOS)){
+          db.createObjectStore(STORE_PHOTOS, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbGetAllPhotos(){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PHOTOS, "readonly");
+      const store = tx.objectStore(STORE_PHOTOS);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  async function idbPutPhoto(rec){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PHOTOS, "readwrite");
+      const store = tx.objectStore(STORE_PHOTOS);
+      store.put(rec);
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { const e = tx.error || new Error("idbPutPhoto failed"); db.close(); reject(e); };
+    });
+  }
+
+  async function idbDeletePhoto(id){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PHOTOS, "readwrite");
+      const store = tx.objectStore(STORE_PHOTOS);
+      store.delete(id);
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { const e = tx.error || new Error("idbDeletePhoto failed"); db.close(); reject(e); };
+    });
+  }
+
+  async function idbClearPhotos(){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PHOTOS, "readwrite");
+      const store = tx.objectStore(STORE_PHOTOS);
+      store.clear();
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { const e = tx.error || new Error("idbClearPhotos failed"); db.close(); reject(e); };
+    });
+  }
+
+  const DEFAULT_SETTINGS = {
+    useNow: true,
+    customTime: "",
+    timeFormat: "thaiVerboseGmt",
+
+    outputMode: "preset",
+    outputSize: "1080x2340",
+    fitMode: "contain",
+
+    overlayPos: "tr",
+    overlayPad: 24,
+    fontAuto: true,
+    fontScale: 100,
+    fontPx: 32,
+
+    enableLocation: false,
+    showLatLng: true,
+    showAddress: true,
+    lat: "",
+    lng: "",
+    placeQuery: "",
+
+    enableLogPanel: false,
+
+    /* ✅ กล้องเปิด/ปิดจาก toggle */
+    cameraEnabled: true,
+  };
+
+  /* DOM */
+  const viewfinder = document.getElementById("viewfinder");
+  const camVideo = document.getElementById("camVideo");
+  const vfHint = document.getElementById("vfHint");
+
+  const presetGuide = document.getElementById("presetGuide");
+  const maskTop = document.getElementById("maskTop");
+  const maskBottom = document.getElementById("maskBottom");
+  const maskLeft = document.getElementById("maskLeft");
+  const maskRight = document.getElementById("maskRight");
+  const guideFrame = document.getElementById("guideFrame");
+  const guideLabel = document.getElementById("guideLabel");
+
+  const btnTorch = document.getElementById("btnTorch");
+  const btnImport = document.getElementById("btnImport");
+  const btnDownloadAll = document.getElementById("btnDownloadAll");
+  const btnSettings = document.getElementById("btnSettings");
+
+  const btnShutter = document.getElementById("btnShutter");
+  const btnSwitchCam = document.getElementById("btnSwitchCam");
+  const btnDeleteAll = document.getElementById("btnDeleteAll");
+
+  const fileInput = document.getElementById("fileInput");
+  const gallery = document.getElementById("gallery");
+  const photoCountPill = document.getElementById("photoCountPill");
+
+  const useNowMain = document.getElementById("useNowMain");
+  const customTimeMain = document.getElementById("customTimeMain");
+  const timeSummary = document.getElementById("timeSummary");
+  const locSummary = document.getElementById("locSummary");
+
+  const toast = document.getElementById("toast");
+
+  // ✅ Camera toggle
+  const btnCamToggle = document.getElementById("btnCamToggle");
+  const camToggleKnob = document.getElementById("camToggleKnob");
+
+  // Preview
+  const previewBackdrop = document.getElementById("previewBackdrop");
+  const btnClosePreview = document.getElementById("btnClosePreview");
+  const previewCanvas = document.getElementById("previewCanvas");
+  const previewTitle = document.getElementById("previewTitle");
+  const photoTimeNow = document.getElementById("photoTimeNow");
+  const photoTimeCustom = document.getElementById("photoTimeCustom");
+  const photoCustomTime = document.getElementById("photoCustomTime");
+  const dlType = document.getElementById("dlType");
+  const dlQuality = document.getElementById("dlQuality");
+  const btnDownloadOne = document.getElementById("btnDownloadOne");
+  const btnDeleteOne = document.getElementById("btnDeleteOne");
+  const previewStatus = document.getElementById("previewStatus");
+
+  // Settings
+  const settingsBackdrop = document.getElementById("settingsBackdrop");
+  const btnCloseSettings = document.getElementById("btnCloseSettings");
+  const btnCloseSettings2 = document.getElementById("btnCloseSettings2");
+  const btnSaveSettings = document.getElementById("btnSaveSettings");
+
+  const useNow = document.getElementById("useNow");
+  const customTime = document.getElementById("customTime");
+  const timeStatus = document.getElementById("timeStatus");
+  const timeFormat = document.getElementById("timeFormat");
+
+  const outputMode = document.getElementById("outputMode");
+  const outputSize = document.getElementById("outputSize");
+  const fitMode = document.getElementById("fitMode");
+  const outStatus = document.getElementById("outStatus");
+
+  const overlayPos = document.getElementById("overlayPos");
+  const overlayPad = document.getElementById("overlayPad");
+  const fontScale = document.getElementById("fontScale");
+  const fontPx = document.getElementById("fontPx");
+  const fontAuto = document.getElementById("fontAuto");
+
+  const enableLocation = document.getElementById("enableLocation");
+  const showLatLng = document.getElementById("showLatLng");
+  const showAddress = document.getElementById("showAddress");
+  const btnUseGPS = document.getElementById("btnUseGPS");
+  const btnOpenMap = document.getElementById("btnOpenMap");
+  const latEl = document.getElementById("lat");
+  const lngEl = document.getElementById("lng");
+  const placeQuery = document.getElementById("placeQuery");
+  const btnSearchPlace = document.getElementById("btnSearchPlace");
+  const locStatus = document.getElementById("locStatus");
+
+  const enableLogPanel = document.getElementById("enableLogPanel");
+  const logPre = document.getElementById("logPre");
+  const btnCopyLog = document.getElementById("btnCopyLog");
+  const btnClearLog = document.getElementById("btnClearLog");
+
+  const btnResetSettings = document.getElementById("btnResetSettings");
+  const btnDeleteAllInSettings = document.getElementById("btnDeleteAllInSettings");
+
+  // Map modal
+  const mapBackdrop = document.getElementById("mapBackdrop");
+  const btnCloseMap = document.getElementById("btnCloseMap");
+  const btnConfirmMap = document.getElementById("btnConfirmMap");
+  const btnCancelMap = document.getElementById("btnCancelMap");
+  const mapHint = document.getElementById("mapHint");
+
+  /* Utils */
+  const pad2 = (n) => String(n).padStart(2,"0");
+  const clamp = (v,min,max) => Math.max(min, Math.min(max, v));
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+  const logs = [];
+  function ts(){
+    const d = new Date();
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  }
+  function addLog(line){
+    const msg = `[${ts()}] ${line}`;
+    logs.push(msg);
+    if (logs.length > 350) logs.shift();
+    if (enableLogPanel.checked) logPre.textContent = logs.join("\n");
+  }
+  window.addEventListener("error", (e) => addLog(`ERR: ${e.message || "unknown"} @ ${e.filename || ""}:${e.lineno || ""}`));
+  window.addEventListener("unhandledrejection", (e) => addLog(`PROMISE: ${String(e.reason || "unknown")}`));
+
+  let toastTimer = null;
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.display = "none"; }, 1400);
+  }
+
+  function openBackdrop(el){
+    el.style.display = "flex";
+    el.setAttribute("aria-hidden","false");
+  }
+  function closeBackdrop(el){
+    el.style.display = "none";
+    el.setAttribute("aria-hidden","true");
+  }
+
+  function parseSize(v){
+    const m = String(v||"").match(/^(\d+)\s*x\s*(\d+)$/i);
+    if (!m) return {w:1080,h:2340};
+    const w = Number(m[1]), h = Number(m[2]);
+    return (Number.isFinite(w) && Number.isFinite(h) && w>0 && h>0) ? {w,h} : {w:1080,h:2340};
+  }
+
+  function buildFileStamp(d){
+    const yyyy = d.getFullYear();
+    const MM = pad2(d.getMonth()+1);
+    const dd = pad2(d.getDate());
+    const HH = pad2(d.getHours());
+    const mm = pad2(d.getMinutes());
+    const ss = pad2(d.getSeconds());
+    return `${yyyy}${MM}${dd}_${HH}${mm}${ss}`;
+  }
+
+  function formatThaiVerboseGmt(date){
+    const d = date.getDate();
+    const m = date.toLocaleString("th-TH", { month: "short" });
+    const y = date.getFullYear();
+    const HH = date.getHours();
+    const mm = date.getMinutes();
+    const ss = date.getSeconds();
+
+    const offMin = -date.getTimezoneOffset();
+    const sign = offMin >= 0 ? "+" : "-";
+    const abs = Math.abs(offMin);
+    const oh = pad2(Math.floor(abs/60));
+    const om = pad2(abs%60);
+    const tz = `GMT${sign}${oh}:${om}`;
+    return `${d} ${m}. ${y} ${HH} นาฬิกา ${mm} นาที ${ss} วินาที ${tz}`;
+  }
+
+  function formatIsoLike(date){
+    const yyyy = date.getFullYear();
+    const MM = pad2(date.getMonth()+1);
+    const dd = pad2(date.getDate());
+    const HH = pad2(date.getHours());
+    const mm = pad2(date.getMinutes());
+    const ss = pad2(date.getSeconds());
+    return `${yyyy}-${MM}-${dd} ${HH}:${mm}:${ss}`;
+  }
+
+  function formatBySetting(date){
+    const fmt = state.settings.timeFormat || "thaiVerboseGmt";
+    if (fmt === "isoLike") return formatIsoLike(date);
+    return formatThaiVerboseGmt(date);
+  }
+
+  function toNumberOrNull(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function hasValidLatLng(){
+    const la = toNumberOrNull(latEl.value);
+    const ln = toNumberOrNull(lngEl.value);
+    if (la===null || ln===null) return false;
+    return la>=-90 && la<=90 && ln>=-180 && ln<=180;
+  }
+
+  /* State */
+  const state = {
+    settings: readSettings(),
+    photos: [],
+    selectedId: null,
+
+    cam: {
+      stream: null,
+      devices: [],
+      deviceIndex: 0,
+      facingMode: "environment",
+      torchSupported: false,
+      torchOn: false,
+    },
+
+    addressText: "",
+    map: null,
+    marker: null,
+    pendingPick: null,
+  };
+
+  /* Settings */
+  function readSettings(){
+    try{
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return {...DEFAULT_SETTINGS};
+      const obj = JSON.parse(raw);
+      return {...DEFAULT_SETTINGS, ...(obj||{})};
+    } catch {
+      return {...DEFAULT_SETTINGS};
+    }
+  }
+
+  let saveTimer = null;
+  function scheduleSaveSettings(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try{
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+        addLog("saved settings");
+      } catch (e){
+        addLog("save settings failed: " + String(e?.message||e));
+      }
+    }, 220);
+  }
+
+  function syncCameraToggleUI(){
+    const on = !!state.settings.cameraEnabled;
+    btnCamToggle.classList.toggle("on", on);
+    btnCamToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    camToggleKnob.textContent = on ? "📷" : "🚫";
+    btnCamToggle.title = on ? "Camera: ON" : "Camera: OFF";
+  }
+
+  function applySettingsToUI(){
+    useNow.checked = !!state.settings.useNow;
+    customTime.value = state.settings.customTime || "";
+    timeFormat.value = state.settings.timeFormat || "thaiVerboseGmt";
+
+    outputMode.value = state.settings.outputMode || "preset";
+    outputSize.value = state.settings.outputSize || "1080x2340";
+    fitMode.value = state.settings.fitMode || "contain";
+
+    overlayPos.value = state.settings.overlayPos || "tr";
+    overlayPad.value = String(state.settings.overlayPad ?? 24);
+    fontAuto.checked = !!state.settings.fontAuto;
+    fontScale.value = String(state.settings.fontScale ?? 100);
+    fontPx.value = String(state.settings.fontPx ?? 32);
+
+    enableLocation.checked = !!state.settings.enableLocation;
+    showLatLng.checked = (state.settings.showLatLng ?? true);
+    showAddress.checked = (state.settings.showAddress ?? true);
+    latEl.value = state.settings.lat ?? "";
+    lngEl.value = state.settings.lng ?? "";
+    placeQuery.value = state.settings.placeQuery ?? "";
+
+    enableLogPanel.checked = !!state.settings.enableLogPanel;
+    logPre.textContent = enableLogPanel.checked ? logs.join("\n") : "";
+
+    useNowMain.checked = !!state.settings.useNow;
+    customTimeMain.value = state.settings.customTime || "";
+
+    syncCameraToggleUI();
+    updateTimeUI();
+    updateOutputUI();
+    updateOverlayUI();
+    refreshLocSummary();
+    updateLogUI();
+    updatePresetGuide();
+  }
+
+  function updateLogUI(){
+    logPre.style.display = enableLogPanel.checked ? "block" : "none";
+    if (enableLogPanel.checked) logPre.textContent = logs.join("\n");
+  }
+
+  function updateOutputUI(){
+    const mode = state.settings.outputMode;
+    outputSize.disabled = (mode !== "preset");
+    fitMode.disabled = (mode !== "preset");
+    if (mode === "original"){
+      outStatus.textContent = "Output = ขนาดรูปเดิม (Original)";
+    } else {
+      const s = parseSize(state.settings.outputSize);
+      outStatus.textContent = `Output = ${s.w}×${s.h} • Fit = ${state.settings.fitMode === "cover" ? "Cover" : "Contain"}`;
+    }
+  }
+
+  function updateOverlayUI(){
+    fontScale.disabled = !fontAuto.checked;
+    fontPx.disabled = fontAuto.checked;
+  }
+
+  function updateTimeUI(){
+    customTimeMain.style.display = state.settings.useNow ? "none" : "block";
+    customTime.style.display = state.settings.useNow ? "none" : "block";
+
+    if (state.settings.useNow){
+      timeSummary.textContent = "ใช้เวลาปัจจุบัน (ล็อกเวลาตอนถ่าย/นำเข้า)";
+      timeStatus.textContent = "โหมด: เวลาปัจจุบัน — รูปใหม่จะล็อก timestamp ตอนถ่าย/นำเข้า";
+    } else {
+      const v = state.settings.customTime;
+      timeSummary.textContent = v ? `เลือกเวลาเอง: ${v.replace("T"," ")}` : "เลือกเวลาเอง (ยังไม่ตั้งค่า)";
+      timeStatus.textContent = v ? `เวลาที่จะใช้เป็นค่าเริ่มต้นของรูปใหม่: ${v.replace("T"," ")}` : "กรุณาเลือกเวลา (datetime-local)";
+    }
+  }
+
+  /* ✅ Preset guide */
+  function updatePresetGuide(){
+    if (state.settings.outputMode !== "preset"){
+      presetGuide.classList.remove("show");
+      presetGuide.setAttribute("aria-hidden","true");
+      return;
+    }
+
+    const vfW = viewfinder.clientWidth;
+    const vfH = viewfinder.clientHeight;
+    if (vfW <= 10 || vfH <= 10) return;
+
+    const {w:pw, h:ph} = parseSize(state.settings.outputSize);
+    const presetAspect = pw / ph;
+    const vfAspect = vfW / vfH;
+
+    let frameW, frameH;
+    if (presetAspect <= vfAspect){
+      frameH = vfH;
+      frameW = frameH * presetAspect;
+      if (frameW > vfW){
+        frameW = vfW;
+        frameH = frameW / presetAspect;
+      }
+    } else {
+      frameW = vfW;
+      frameH = frameW / presetAspect;
+      if (frameH > vfH){
+        frameH = vfH;
+        frameW = frameH * presetAspect;
+      }
+    }
+
+    const margin = Math.max(10, Math.round(Math.min(vfW, vfH) * 0.04));
+    const scale = Math.min((vfW - margin*2) / frameW, (vfH - margin*2) / frameH, 1);
+    frameW = Math.round(frameW * scale);
+    frameH = Math.round(frameH * scale);
+
+    const x = Math.round((vfW - frameW) / 2);
+    const y = Math.round((vfH - frameH) / 2);
+
+    guideFrame.style.left = x + "px";
+    guideFrame.style.top = y + "px";
+    guideFrame.style.width = frameW + "px";
+    guideFrame.style.height = frameH + "px";
+
+    maskTop.style.left = "0px";
+    maskTop.style.top = "0px";
+    maskTop.style.width = vfW + "px";
+    maskTop.style.height = y + "px";
+
+    maskBottom.style.left = "0px";
+    maskBottom.style.top = (y + frameH) + "px";
+    maskBottom.style.width = vfW + "px";
+    maskBottom.style.height = (vfH - (y + frameH)) + "px";
+
+    maskLeft.style.left = "0px";
+    maskLeft.style.top = y + "px";
+    maskLeft.style.width = x + "px";
+    maskLeft.style.height = frameH + "px";
+
+    maskRight.style.left = (x + frameW) + "px";
+    maskRight.style.top = y + "px";
+    maskRight.style.width = (vfW - (x + frameW)) + "px";
+    maskRight.style.height = frameH + "px";
+
+    guideLabel.textContent = `Preset frame: ${pw}×${ph}`;
+    presetGuide.classList.add("show");
+    presetGuide.setAttribute("aria-hidden","false");
+  }
+
+  window.addEventListener("resize", () => {
+    requestAnimationFrame(updatePresetGuide);
+  });
+
+  /* Camera */
+  async function stopCamera(){
+    try{
+      if (state.cam.stream){
+        state.cam.stream.getTracks().forEach(t => t.stop());
+      }
+    } catch {}
+    state.cam.stream = null;
+    camVideo.srcObject = null;
+    state.cam.torchSupported = false;
+    state.cam.torchOn = false;
+    btnTorch.disabled = true;
+    btnSwitchCam.disabled = true;
+  }
+
+  async function enumerateVideoDevices(){
+    try{
+      const list = await navigator.mediaDevices.enumerateDevices();
+      state.cam.devices = list.filter(d => d.kind === "videoinput");
+      addLog(`devices: ${state.cam.devices.length} videoinput`);
+    } catch (e){
+      addLog("enumerateDevices failed: " + String(e?.message||e));
+      state.cam.devices = [];
+    }
+  }
+
+  function updateMirrorClass(){
+    const isFront = (state.cam.facingMode === "user");
+    camVideo.classList.toggle("mirror", isFront);
+  }
+
+  async function startCamera({deviceId=null, facingMode=null} = {}){
+    vfHint.textContent = "กำลังเปิดกล้อง…";
+    try{
+      if (!navigator.mediaDevices?.getUserMedia){
+        vfHint.textContent = "เบราว์เซอร์นี้ไม่รองรับกล้อง (ใช้ Import รูปแทนได้)";
+        showToast("กล้องไม่รองรับ");
+        return;
+      }
+
+      await stopCamera();
+
+      if (facingMode) state.cam.facingMode = facingMode;
+
+      const constraints = {
+        video: {
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          ...(deviceId ? {} : { facingMode: { ideal: state.cam.facingMode } }),
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      state.cam.stream = stream;
+      camVideo.srcObject = stream;
+
+      updateMirrorClass();
+      vfHint.textContent = "";
+      showToast("กล้องพร้อมใช้งาน");
+
+      await enumerateVideoDevices();
+      btnSwitchCam.disabled = (state.cam.devices.length < 2);
+
+      const track = stream.getVideoTracks()?.[0];
+      if (track && track.getCapabilities){
+        const caps = track.getCapabilities();
+        state.cam.torchSupported = !!caps.torch;
+        btnTorch.disabled = !state.cam.torchSupported;
+      } else {
+        state.cam.torchSupported = false;
+        btnTorch.disabled = true;
+      }
+
+      addLog(`camera started: facing=${state.cam.facingMode} torch=${state.cam.torchSupported}`);
+
+      requestAnimationFrame(updatePresetGuide);
+    } catch (e){
+      vfHint.textContent = "เปิดกล้องไม่สำเร็จ (ต้องอนุญาตกล้อง + ใช้ HTTPS / GitHub Pages) — ยังสามารถ Import รูปได้";
+      showToast("เปิดกล้องไม่สำเร็จ");
+      addLog("camera start failed: " + String(e?.message||e));
+      await stopCamera();
+    }
+  }
+
+  async function switchCamera(){
+    try{
+      if (!state.settings.cameraEnabled){
+        showToast("กล้องปิดอยู่");
+        return;
+      }
+
+      if (state.cam.devices.length >= 2){
+        state.cam.deviceIndex = (state.cam.deviceIndex + 1) % state.cam.devices.length;
+        const next = state.cam.devices[state.cam.deviceIndex];
+        const label = (next.label || "").toLowerCase();
+        if (label.includes("front") || label.includes("user")) state.cam.facingMode = "user";
+        else if (label.includes("back") || label.includes("rear") || label.includes("environment")) state.cam.facingMode = "environment";
+        await startCamera({deviceId: next.deviceId, facingMode: state.cam.facingMode});
+        updateMirrorClass();
+        return;
+      }
+
+      state.cam.facingMode = (state.cam.facingMode === "environment") ? "user" : "environment";
+      await startCamera({facingMode: state.cam.facingMode});
+      updateMirrorClass();
+    } catch (e){
+      addLog("switchCamera failed: " + String(e?.message||e));
+      showToast("สลับกล้องไม่สำเร็จ");
+    }
+  }
+
+  async function toggleTorch(){
+    try{
+      if (!state.cam.stream) return;
+      const track = state.cam.stream.getVideoTracks()?.[0];
+      if (!track || !track.applyConstraints) return;
+
+      state.cam.torchOn = !state.cam.torchOn;
+      await track.applyConstraints({ advanced: [{ torch: state.cam.torchOn }] });
+      showToast(state.cam.torchOn ? "Torch: ON" : "Torch: OFF");
+      addLog("torch: " + (state.cam.torchOn ? "on" : "off"));
+    } catch (e){
+      state.cam.torchOn = false;
+      showToast("Torch ไม่รองรับ");
+      addLog("torch failed: " + String(e?.message||e));
+    }
+  }
+
+  /* EXIF fix */
+  async function getExifOrientation(file){
+    try{
+      if (!file || !file.type || !file.type.toLowerCase().includes("jpeg")) return 1;
+      const buf = await file.arrayBuffer();
+      const view = new DataView(buf);
+      if (view.getUint16(0, false) !== 0xFFD8) return 1;
+
+      let offset = 2;
+      const length = view.byteLength;
+
+      while (offset < length){
+        if (view.getUint8(offset) !== 0xFF) break;
+        const marker = view.getUint16(offset, false);
+        offset += 2;
+
+        if (marker === 0xFFE1){
+          offset += 2;
+          if (view.getUint32(offset, false) !== 0x45786966) return 1;
+          offset += 6;
+
+          const tiffOffset = offset;
+          const endianness = view.getUint16(tiffOffset, false);
+          const little = (endianness === 0x4949);
+          if (!little && endianness !== 0x4D4D) return 1;
+
+          const getU16 = (o) => view.getUint16(o, little);
+          const getU32 = (o) => view.getUint32(o, little);
+
+          if (getU16(tiffOffset + 2) !== 0x002A) return 1;
+
+          const ifd0Offset = getU32(tiffOffset + 4);
+          let dirOffset = tiffOffset + ifd0Offset;
+          if (dirOffset < 0 || dirOffset > length - 2) return 1;
+
+          const entries = getU16(dirOffset);
+          dirOffset += 2;
+
+          for (let i=0;i<entries;i++){
+            const entryOffset = dirOffset + i*12;
+            if (entryOffset + 12 > length) break;
+            const tag = getU16(entryOffset);
+            if (tag === 0x0112){
+              const type = getU16(entryOffset + 2);
+              const count = getU32(entryOffset + 4);
+              if (type !== 3 || count !== 1) return 1;
+              const valOffset = entryOffset + 8;
+              const orient = getU16(valOffset);
+              return (orient >= 1 && orient <= 8) ? orient : 1;
+            }
+          }
+          return 1;
+        } else {
+          if (offset + 2 > length) break;
+          const size = view.getUint16(offset, false);
+          offset += size;
+        }
+      }
+      return 1;
+    } catch (e){
+      addLog("getExifOrientation fallback: " + String(e?.message||e));
+      return 1;
+    }
+  }
+
+  function drawWithOrientation(img, orientation){
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const c = document.createElement("canvas");
+    const ctx = c.getContext("2d");
+
+    if ([5,6,7,8].includes(orientation)){
+      c.width = h; c.height = w;
+    } else {
+      c.width = w; c.height = h;
+    }
+
+    ctx.save();
+    switch (orientation){
+      case 2: ctx.translate(w, 0); ctx.scale(-1, 1); break;
+      case 3: ctx.translate(w, h); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(0, h); ctx.scale(1, -1); break;
+      case 5: ctx.rotate(0.5*Math.PI); ctx.scale(1, -1); break;
+      case 6: ctx.translate(h, 0); ctx.rotate(0.5*Math.PI); break;
+      case 7: ctx.translate(h, 0); ctx.rotate(0.5*Math.PI); ctx.scale(-1, 1); break;
+      case 8: ctx.translate(0, w); ctx.rotate(-0.5*Math.PI); break;
+      default: break;
+    }
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    return c;
+  }
+
+  async function loadImageFromFile(file){
+    const blobUrl = URL.createObjectURL(file);
+    try{
+      const img = await new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error("Image onerror(blobUrl)"));
+        im.src = blobUrl;
+      });
+      return img;
+    } finally {
+      setTimeout(() => { try{ URL.revokeObjectURL(blobUrl); }catch{} }, 1200);
+    }
+  }
+
+  /* Photos */
+  function getDefaultPhotoTime(){
+    if (state.settings.useNow){
+      return { mode: "now", iso: new Date().toISOString() };
+    }
+    const v = state.settings.customTime;
+    if (v){
+      const d = new Date(v);
+      return { mode: "custom", iso: d.toISOString() };
+    }
+    return { mode: "now", iso: new Date().toISOString() };
+  }
+
+  async function canvasToBlob(canvas, type="image/jpeg", quality=0.95){
+    return new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), type, quality);
+    });
+  }
+
+  async function createThumbUrlFromBlob(blob){
+    return URL.createObjectURL(blob);
+  }
+
+  async function persistPhotoToIDB(p){
+    try{
+      await idbPutPhoto({
+        id: p.id,
+        baseBlob: p.baseBlob,
+        w: p.w,
+        h: p.h,
+        createdAtISO: p.createdAtISO,
+        timeMode: p.timeMode,
+        timeValueISO: p.timeValueISO,
+        sourceName: p.sourceName,
+        fromFrontMirror: p.fromFrontMirror
+      });
+      addLog(`idb saved photo: ${p.id}`);
+    } catch (e){
+      addLog("idb save failed: " + String(e?.message||e));
+    }
+  }
+
+  async function restorePhotosFromIDB(){
+    try{
+      if (!("indexedDB" in window)){
+        addLog("indexedDB not available");
+        return;
+      }
+      const rows = await idbGetAllPhotos();
+      if (!Array.isArray(rows) || rows.length === 0){
+        addLog("idb restore: 0 photos");
+        return;
+      }
+
+      // sort by createdAtISO (best-effort)
+      rows.sort((a,b) => String(a.createdAtISO||"").localeCompare(String(b.createdAtISO||"")));
+
+      for (const r of rows){
+        if (!r || !r.id || !r.baseBlob) continue;
+        const p = {
+          id: r.id,
+          baseBlob: r.baseBlob,
+          w: r.w || 0,
+          h: r.h || 0,
+          thumbUrl: await createThumbUrlFromBlob(r.baseBlob),
+          createdAtISO: r.createdAtISO || new Date().toISOString(),
+          timeMode: r.timeMode || "now",
+          timeValueISO: r.timeValueISO || (r.createdAtISO || new Date().toISOString()),
+          sourceName: r.sourceName || "restored",
+          fromFrontMirror: !!r.fromFrontMirror
+        };
+        state.photos.push(p);
+      }
+
+      addLog(`idb restore: ${state.photos.length} photos`);
+      showToast(`กู้คืน ${state.photos.length} รูป`);
+    } catch (e){
+      addLog("idb restore failed: " + String(e?.message||e));
+    }
+  }
+
+  async function addPhotoFromBaseCanvas(baseCanvas, {sourceName="camera", fromFrontMirror=false} = {}){
+    const baseBlob = await canvasToBlob(baseCanvas, "image/jpeg", 0.95); // strips EXIF
+    const t = getDefaultPhotoTime();
+    const p = {
+      id: uid(),
+      baseBlob,
+      w: baseCanvas.width,
+      h: baseCanvas.height,
+      thumbUrl: await createThumbUrlFromBlob(baseBlob),
+      createdAtISO: new Date().toISOString(),
+      timeMode: t.mode,
+      timeValueISO: t.iso,
+      sourceName,
+      fromFrontMirror: !!fromFrontMirror
+    };
+    state.photos.push(p);
+
+    // ✅ persist
+    await persistPhotoToIDB(p);
+
+    updateGallery();
+    updateButtons();
+    showToast("เพิ่มรูปแล้ว");
+    addLog(`photo added: ${p.id} ${p.w}x${p.h} ${sourceName}`);
+  }
+
+  async function addPhotosFromFiles(files){
+    if (!files || !files.length) return;
+    showToast("กำลังนำเข้ารูป…");
+    for (const f of files){
+      try{
+        const img = await loadImageFromFile(f);
+        const orient = await getExifOrientation(f);
+        const corrected = drawWithOrientation(img, orient);
+        await addPhotoFromBaseCanvas(corrected, {sourceName: f.name || "file"});
+      } catch (e){
+        addLog("import failed: " + String(e?.message||e));
+      }
+    }
+    refreshLocSummary();
+  }
+
+  function deletePhoto(id){
+    const idx = state.photos.findIndex(p => p.id === id);
+    if (idx < 0) return;
+    try{ URL.revokeObjectURL(state.photos[idx].thumbUrl); } catch {}
+    state.photos.splice(idx, 1);
+    if (state.selectedId === id) state.selectedId = null;
+
+    // ✅ delete from idb (fire and forget)
+    idbDeletePhoto(id).catch(e => addLog("idb delete failed: " + String(e?.message||e)));
+
+    updateGallery();
+    updateButtons();
+    showToast("ลบรูปแล้ว");
+    addLog("photo deleted: " + id);
+  }
+
+  function deleteAllPhotos(){
+    for (const p of state.photos){
+      try{ URL.revokeObjectURL(p.thumbUrl); } catch {}
+    }
+    state.photos = [];
+    state.selectedId = null;
+
+    // ✅ clear idb
+    idbClearPhotos().catch(e => addLog("idb clear failed: " + String(e?.message||e)));
+
+    updateGallery();
+    updateButtons();
+    showToast("ลบทั้งหมดแล้ว");
+    addLog("photos cleared");
+  }
+
+  function updateButtons(){
+    const has = state.photos.length > 0;
+    btnDownloadAll.disabled = !has;
+    btnDeleteAll.disabled = !has;
+    btnDeleteAllInSettings.disabled = !has;
+    photoCountPill.textContent = `${state.photos.length} รูป`;
+
+    // ✅ lock shutter/switchcam if camera off
+    const camOn = !!state.settings.cameraEnabled;
+    btnShutter.disabled = !camOn;
+    btnSwitchCam.disabled = (!camOn) || (state.cam.devices.length < 2) || !state.cam.stream;
+    btnTorch.disabled = (!camOn) || !state.cam.torchSupported || !state.cam.stream;
+  }
+
+  function updateGallery(){
+    gallery.innerHTML = "";
+    if (state.photos.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "pill";
+      empty.style.marginLeft = "2px";
+      empty.textContent = "ยังไม่มีรูป — ถ่ายหรือ Import เพื่อเริ่ม";
+      gallery.appendChild(empty);
+      return;
+    }
+
+    state.photos.forEach((p, i) => {
+      const t = document.createElement("div");
+      t.className = "thumb";
+      t.dataset.id = p.id;
+
+      const img = document.createElement("img");
+      img.src = p.thumbUrl;
+      img.alt = `thumb-${i+1}`;
+
+      const idx = document.createElement("div");
+      idx.className = "idx";
+      idx.textContent = String(i+1);
+
+      const del = document.createElement("div");
+      del.className = "del";
+      del.title = "Delete";
+      del.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3 1.4 1.4z"/></svg>`;
+      del.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        deletePhoto(p.id);
+      });
+
+      t.addEventListener("click", () => openPreview(p.id));
+
+      t.appendChild(img);
+      t.appendChild(idx);
+      t.appendChild(del);
+      gallery.appendChild(t);
+    });
+  }
+
+  /* Overlay render */
+  function computeFontSize(outW, outH){
+    if (!state.settings.fontAuto){
+      const px = Number(state.settings.fontPx) || 32;
+      return clamp(px, 10, 220);
+    }
+    const base = Math.min(outW, outH);
+    const autoPx = clamp(Math.round(base * 0.022), 12, 220);
+    const scalePct = clamp(Number(state.settings.fontScale) || 100, 50, 250);
+    return clamp(Math.round(autoPx * (scalePct/100)), 10, 220);
+  }
+
+  function buildOverlayLines(date){
+    const s = formatBySetting(date);
+    const lines = [`Network: ${s}`, `Local: ${s}`];
+
+    if (state.settings.enableLocation && hasValidLatLng()){
+      const lat = Number(latEl.value);
+      const lng = Number(lngEl.value);
+      if (state.settings.showLatLng) lines.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      if (state.settings.showAddress) lines.push(state.addressText ? state.addressText : "(ที่อยู่ยังไม่พร้อม)");
+    }
+    return lines;
+  }
+
+  function drawOverlayText(ctx, lines, outW, outH){
+    const fontSize = computeFontSize(outW, outH);
+    const pad = clamp(Number(state.settings.overlayPad) || 24, 8, 120);
+    const lineGap = Math.round(fontSize * 1.18);
+
+    const pos = state.settings.overlayPos || "tr";
+    const isTop = (pos === "tr" || pos === "tl");
+    const isRight = (pos === "tr" || pos === "br");
+
+    ctx.save();
+    ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif`;
+    ctx.textAlign = isRight ? "right" : "left";
+    ctx.textBaseline = isTop ? "top" : "bottom";
+
+    ctx.shadowColor = "rgba(0,0,0,.85)";
+    ctx.shadowBlur = Math.round(fontSize * 0.35);
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
+
+    const x = isRight ? (outW - pad) : pad;
+    let y = isTop ? pad : (outH - pad);
+
+    ctx.strokeStyle = "rgba(0,0,0,.92)";
+    ctx.lineWidth = Math.max(3, Math.round(fontSize * 0.14));
+    ctx.fillStyle = "rgba(255,255,255,.96)";
+
+    if (isTop){
+      for (const line of lines){
+        ctx.strokeText(line, x, y);
+        ctx.fillText(line, x, y);
+        y += lineGap;
+      }
+    } else {
+      for (let i = lines.length - 1; i >= 0; i--){
+        const line = lines[i];
+        ctx.strokeText(line, x, y);
+        ctx.fillText(line, x, y);
+        y -= lineGap;
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawContain(ctx, srcW, srcH, outW, outH, drawFn){
+    ctx.clearRect(0,0,outW,outH);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0,outW,outH);
+
+    const scale = Math.min(outW/srcW, outH/srcH);
+    const dw = Math.round(srcW*scale);
+    const dh = Math.round(srcH*scale);
+    const dx = Math.round((outW-dw)/2);
+    const dy = Math.round((outH-dh)/2);
+    drawFn(dx, dy, dw, dh);
+  }
+
+  function drawCover(ctx, srcW, srcH, outW, outH, drawFn){
+    ctx.clearRect(0,0,outW,outH);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0,outW,outH);
+
+    const scale = Math.max(outW/srcW, outH/srcH);
+    const dw = Math.round(srcW*scale);
+    const dh = Math.round(srcH*scale);
+    const dx = Math.round((outW-dw)/2);
+    const dy = Math.round((outH-dh)/2);
+    drawFn(dx, dy, dw, dh);
+  }
+
+  async function renderPhotoToCanvas(photo, canvas, {forPreview=false} = {}){
+    const ctx = canvas.getContext("2d", { alpha:false });
+
+    let date = new Date(photo.timeValueISO || photo.createdAtISO || Date.now());
+    if (!(date instanceof Date) || isNaN(date.getTime())) date = new Date();
+
+    if (state.settings.enableLocation && hasValidLatLng() && state.settings.showAddress && !state.addressText){
+      try{
+        state.addressText = await reverseGeocode(Number(latEl.value), Number(lngEl.value));
+      } catch (e){
+        addLog("reverseGeocode failed (lazy): " + String(e?.message||e));
+      }
+    }
+
+    const baseBmp = await createImageBitmap(photo.baseBlob);
+    const sw = baseBmp.width;
+    const sh = baseBmp.height;
+
+    let outW, outH;
+    if (state.settings.outputMode === "original"){
+      outW = sw; outH = sh;
+    } else {
+      const s = parseSize(state.settings.outputSize);
+      outW = s.w; outH = s.h;
+    }
+
+    if (forPreview){
+      const maxW = 1280;
+      if (outW > maxW){
+        const ratio = maxW / outW;
+        outW = Math.round(outW * ratio);
+        outH = Math.round(outH * ratio);
+      }
+    }
+
+    canvas.width = outW;
+    canvas.height = outH;
+
+    const drawFn = (dx,dy,dw,dh) => {
+      ctx.drawImage(baseBmp, 0,0, sw,sh, dx,dy,dw,dh);
+    };
+
+    if (state.settings.outputMode === "original"){
+      ctx.clearRect(0,0,outW,outH);
+      ctx.drawImage(baseBmp, 0,0, sw,sh, 0,0, outW,outH);
+    } else {
+      if (state.settings.fitMode === "cover"){
+        drawCover(ctx, sw, sh, outW, outH, drawFn);
+      } else {
+        drawContain(ctx, sw, sh, outW, outH, drawFn);
+      }
+    }
+
+    const lines = buildOverlayLines(date);
+    drawOverlayText(ctx, lines, outW, outH);
+
+    baseBmp.close?.();
+    return { outW, outH, lines: lines.length };
+  }
+
+  /* ✅ Capture: ครอปตาม “สิ่งที่เห็นใน viewfinder” */
+  async function captureFromCamera(){
+    if (!state.settings.cameraEnabled){
+      showToast("กล้องปิดอยู่ (เปิดจาก toggle ซ้ายบน)");
+      return;
+    }
+    if (!state.cam.stream){
+      showToast("ยังไม่มีกล้อง — ใช้ Import แทนได้");
+      return;
+    }
+
+    const iw = camVideo.videoWidth || 1280;
+    const ih = camVideo.videoHeight || 720;
+
+    const vfW = viewfinder.clientWidth || 360;
+    const vfH = viewfinder.clientHeight || 640;
+
+    const scale = Math.max(vfW / iw, vfH / ih);
+    const srcW = vfW / scale;
+    const srcH = vfH / scale;
+    const sx = (iw - srcW) / 2;
+    const sy = (ih - srcH) / 2;
+
+    const outW = Math.max(1, Math.round(srcW));
+    const outH = Math.max(1, Math.round(srcH));
+
+    const c = document.createElement("canvas");
+    c.width = outW;
+    c.height = outH;
+    const ctx = c.getContext("2d", { alpha:false });
+
+    const isFront = (state.cam.facingMode === "user");
+    ctx.save();
+    if (isFront){
+      ctx.translate(outW, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(camVideo, sx, sy, srcW, srcH, 0, 0, outW, outH);
+    ctx.restore();
+
+    await addPhotoFromBaseCanvas(c, { sourceName: isFront ? "camera(front)" : "camera(back)", fromFrontMirror: isFront });
+  }
+
+  /* Preview modal */
+  function getSelectedPhoto(){
+    return state.photos.find(p => p.id === state.selectedId) || null;
+  }
+
+  async function openPreview(id){
+    state.selectedId = id;
+    const p = getSelectedPhoto();
+    if (!p) return;
+
+    previewTitle.textContent = `Photo #${state.photos.findIndex(x => x.id === id)+1}`;
+
+    if (p.timeMode === "now"){
+      photoTimeNow.classList.add("on");
+      photoTimeCustom.classList.remove("on");
+      photoCustomTime.disabled = true;
+    } else {
+      photoTimeCustom.classList.add("on");
+      photoTimeNow.classList.remove("on");
+      photoCustomTime.disabled = false;
+    }
+
+    const dt = new Date(p.timeValueISO || Date.now());
+    const v = `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}T${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    photoCustomTime.value = v;
+
+    previewStatus.textContent = "กำลังเรนเดอร์…";
+    openBackdrop(previewBackdrop);
+    await renderPreview();
+  }
+
+  async function renderPreview(){
+    const p = getSelectedPhoto();
+    if (!p) return;
+    try{
+      const r = await renderPhotoToCanvas(p, previewCanvas, { forPreview: true });
+      previewStatus.textContent = `Preview: ${r.outW}×${r.outH} • Overlay ${r.lines} บรรทัด`;
+    } catch (e){
+      previewStatus.textContent = "เรนเดอร์ไม่สำเร็จ";
+      addLog("renderPreview failed: " + String(e?.message||e));
+    }
+  }
+
+  function closePreview(){
+    closeBackdrop(previewBackdrop);
+    state.selectedId = null;
+  }
+
+  function setPhotoTimeMode(mode){
+    const p = getSelectedPhoto();
+    if (!p) return;
+
+    if (mode === "now"){
+      p.timeMode = "now";
+      p.timeValueISO = new Date().toISOString();
+      photoTimeNow.classList.add("on");
+      photoTimeCustom.classList.remove("on");
+      photoCustomTime.disabled = true;
+      showToast("ตั้งเวลาเป็นปัจจุบัน (ต่อรูปนี้)");
+    } else {
+      p.timeMode = "custom";
+      const v = photoCustomTime.value;
+      const d = v ? new Date(v) : new Date();
+      p.timeValueISO = d.toISOString();
+      photoTimeCustom.classList.add("on");
+      photoTimeNow.classList.remove("on");
+      photoCustomTime.disabled = false;
+      showToast("ตั้งเวลาเอง (ต่อรูปนี้)");
+    }
+
+    // ✅ persist time change
+    idbPutPhoto({
+      id: p.id,
+      baseBlob: p.baseBlob,
+      w: p.w,
+      h: p.h,
+      createdAtISO: p.createdAtISO,
+      timeMode: p.timeMode,
+      timeValueISO: p.timeValueISO,
+      sourceName: p.sourceName,
+      fromFrontMirror: p.fromFrontMirror
+    }).catch(e => addLog("idb update time failed: " + String(e?.message||e)));
+
+    renderPreview();
+  }
+
+  /* Download */
+  async function downloadPhoto(photo){
+    const type = dlType.value || "image/jpeg";
+    const q = clamp(Number(dlQuality.value) || 0.95, 0.7, 1);
+
+    const outCanvas = document.createElement("canvas");
+    const r = await renderPhotoToCanvas(photo, outCanvas, { forPreview:false });
+
+    const blob = await canvasToBlob(outCanvas, type, q);
+    const ext = (type === "image/png") ? "png" : "jpg";
+    const stamp = buildFileStamp(new Date());
+    const idx = state.photos.findIndex(p => p.id === photo.id) + 1;
+    const name = `PT_${stamp}_${idx}.${ext}`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => { try{ URL.revokeObjectURL(url); }catch{} }, 1200);
+
+    showToast("ดาวน์โหลดแล้ว");
+    addLog(`download one: ${name} (${r.outW}x${r.outH})`);
+  }
+
+  async function downloadAll(){
+    if (state.photos.length === 0) return;
+
+    const type = "image/jpeg";
+    const q = 0.95;
+    const ext = "jpg";
+    const stamp = buildFileStamp(new Date());
+
+    if (window.showDirectoryPicker){
+      try{
+        const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+        showToast("กำลังเขียนไฟล์…");
+
+        for (let i=0;i<state.photos.length;i++){
+          const p = state.photos[i];
+          const outCanvas = document.createElement("canvas");
+          await renderPhotoToCanvas(p, outCanvas, { forPreview:false });
+          const blob = await canvasToBlob(outCanvas, type, q);
+
+          const name = `PT_${stamp}_${i+1}.${ext}`;
+          const fileHandle = await dir.getFileHandle(name, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+        }
+
+        showToast("Download All สำเร็จ");
+        addLog(`downloadAll: wrote ${state.photos.length} files via DirectoryPicker`);
+        return;
+      } catch (e){
+        addLog("DirectoryPicker failed: " + String(e?.message||e));
+        showToast("DirectoryPicker ใช้ไม่ได้ — ใช้ fallback");
+      }
+    }
+
+    if (window.JSZip){
+      try{
+        showToast("กำลังทำ ZIP…");
+        const zip = new JSZip();
+
+        for (let i=0;i<state.photos.length;i++){
+          const p = state.photos[i];
+          const outCanvas = document.createElement("canvas");
+          await renderPhotoToCanvas(p, outCanvas, { forPreview:false });
+          const blob = await canvasToBlob(outCanvas, type, q);
+
+          const name = `PT_${stamp}_${i+1}.${ext}`;
+          zip.file(name, blob);
+        }
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `PT_${stamp}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => { try{ URL.revokeObjectURL(url); }catch{} }, 1500);
+
+        showToast("ดาวน์โหลด ZIP แล้ว");
+        addLog("downloadAll: zip fallback");
+        return;
+      } catch (e){
+        addLog("JSZip failed: " + String(e?.message||e));
+      }
+    }
+
+    showToast("กำลังดาวน์โหลดทีละไฟล์…");
+    for (let i=0;i<state.photos.length;i++){
+      const p = state.photos[i];
+      const outCanvas = document.createElement("canvas");
+      await renderPhotoToCanvas(p, outCanvas, { forPreview:false });
+      const blob = await canvasToBlob(outCanvas, type, q);
+      const name = `PT_${stamp}_${i+1}.${ext}`;
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { try{ URL.revokeObjectURL(url); }catch{} }, 1200);
+
+      await new Promise(r => setTimeout(r, 260));
+    }
+    addLog("downloadAll: sequential fallback");
+  }
+
+  /* Location */
+  async function reverseGeocode(lat, lng){
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, {
+      headers: {
+        "Accept":"application/json",
+        "Accept-Language":"th-TH,th;q=0.9,en;q=0.7"
+      }
+    });
+    if (!res.ok) throw new Error("Reverse geocode failed");
+    const data = await res.json();
+    return data?.display_name || "";
+  }
+
+  async function forwardGeocode(q){
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        "Accept":"application/json",
+        "Accept-Language":"th-TH,th;q=0.9,en;q=0.7"
+      }
+    });
+    if (!res.ok) throw new Error("Search place failed");
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    return { lat: Number(data[0].lat), lng: Number(data[0].lon), display_name: data[0].display_name || "" };
+  }
+
+  async function refreshAddressIfNeeded(){
+    state.addressText = "";
+    if (!state.settings.enableLocation){
+      locStatus.textContent = "ปิดใช้งานตำแหน่ง";
+      refreshLocSummary();
+      return;
+    }
+    if (!hasValidLatLng()){
+      locStatus.textContent = "เปิดใช้งานตำแหน่ง แต่ยังไม่มี Lat/Lng ที่ถูกต้อง";
+      refreshLocSummary();
+      return;
+    }
+
+    const lat = Number(latEl.value);
+    const lng = Number(lngEl.value);
+    let msg = `Lat/Lng: ${lat.toFixed(6)}, ${lng.toFixed(6)} `;
+
+    if (state.settings.showAddress){
+      locStatus.textContent = msg + "กำลังดึงที่อยู่…";
+      try{
+        state.addressText = await reverseGeocode(lat, lng);
+        msg += `\nAddress: ${state.addressText || "(ไม่พบที่อยู่)"}`;
+      } catch (e){
+        msg += `\nAddress: (ดึงไม่ได้ — แนะนำเปิดผ่าน https)`;
+        addLog("reverseGeocode failed: " + String(e?.message||e));
+      }
+    } else {
+      msg += "\nAddress: (ปิด)";
+    }
+
+    locStatus.textContent = msg;
+    refreshLocSummary();
+  }
+
+  function refreshLocSummary(){
+    if (!state.settings.enableLocation){
+      locSummary.textContent = "ปิดใช้งานตำแหน่ง";
+      return;
+    }
+    if (!hasValidLatLng()){
+      locSummary.textContent = "เปิดตำแหน่ง แต่ยังไม่มี Lat/Lng";
+      return;
+    }
+    const lat = Number(latEl.value);
+    const lng = Number(lngEl.value);
+    if (state.settings.showAddress){
+      locSummary.textContent = state.addressText ? state.addressText : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } else {
+      locSummary.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+  }
+
+  /* Map (Leaflet) */
+  function openMap(){
+    if (!window.L){
+      showToast("Leaflet โหลดไม่สำเร็จ");
+      addLog("Leaflet not available");
+      return;
+    }
+    openBackdrop(mapBackdrop);
+
+    const lat = hasValidLatLng() ? Number(latEl.value) : 13.7563;
+    const lng = hasValidLatLng() ? Number(lngEl.value) : 100.5018;
+    state.pendingPick = { lat, lng };
+
+    if (!state.map){
+      state.map = L.map("map", { zoomControl:true }).setView([lat, lng], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap"
+      }).addTo(state.map);
+      state.marker = L.marker([lat, lng]).addTo(state.map);
+
+      state.map.on("click", (e) => {
+        state.pendingPick = { lat: e.latlng.lat, lng: e.latlng.lng };
+        state.marker.setLatLng([state.pendingPick.lat, state.pendingPick.lng]);
+        mapHint.textContent = `เลือก: ${state.pendingPick.lat.toFixed(6)}, ${state.pendingPick.lng.toFixed(6)}`;
+      });
+    } else {
+      state.map.setView([lat,lng], 15);
+      state.marker.setLatLng([lat,lng]);
+    }
+
+    setTimeout(() => state.map.invalidateSize(), 80);
+    mapHint.textContent = "แตะบนแผนที่เพื่อเลือกพิกัด";
+  }
+
+  function closeMap(){ closeBackdrop(mapBackdrop); }
+
+  async function confirmMap(){
+    if (!state.pendingPick) return;
+    latEl.value = state.pendingPick.lat;
+    lngEl.value = state.pendingPick.lng;
+    state.settings.lat = latEl.value;
+    state.settings.lng = lngEl.value;
+    scheduleSaveSettings();
+
+    closeMap();
+    await refreshAddressIfNeeded();
+  }
+
+  /* ✅ Camera Toggle handler */
+  async function setCameraEnabled(on){
+    state.settings.cameraEnabled = !!on;
+    syncCameraToggleUI();
+    scheduleSaveSettings();
+
+    if (!state.settings.cameraEnabled){
+      await stopCamera();
+      vfHint.textContent = "กล้องปิดอยู่ (เปิดจาก toggle ซ้ายบน) — ยังสามารถ Import รูปได้";
+      showToast("Camera: OFF");
+      addLog("camera toggled off");
+    } else {
+      vfHint.textContent = "กำลังเปิดกล้อง…";
+      showToast("Camera: ON");
+      addLog("camera toggled on");
+      await startCamera({ facingMode: state.cam.facingMode });
+    }
+    updateButtons();
+    requestAnimationFrame(updatePresetGuide);
+  }
+
+  /* Events */
+  btnTorch.addEventListener("click", toggleTorch);
+  btnImport.addEventListener("click", () => { fileInput.value = ""; fileInput.click(); });
+  fileInput.addEventListener("change", (e) => {
+    const files = Array.from(e.target.files || []);
+    addPhotosFromFiles(files);
+  });
+
+  btnShutter.addEventListener("click", captureFromCamera);
+  btnSwitchCam.addEventListener("click", switchCamera);
+
+  btnDeleteAll.addEventListener("click", () => {
+    if (state.photos.length === 0) return;
+    if (confirm("ลบรูปทั้งหมดใน session นี้?")) deleteAllPhotos();
+  });
+
+  btnDownloadAll.addEventListener("click", () => downloadAll());
+
+  btnSettings.addEventListener("click", () => openBackdrop(settingsBackdrop));
+  btnCloseSettings.addEventListener("click", () => closeBackdrop(settingsBackdrop));
+  btnCloseSettings2.addEventListener("click", () => closeBackdrop(settingsBackdrop));
+  btnSaveSettings.addEventListener("click", () => {
+    scheduleSaveSettings();
+    closeBackdrop(settingsBackdrop);
+    showToast("บันทึกแล้ว");
+  });
+
+  // ✅ Toggle click (ซ้าย=ปิด ขวา=เปิด)
+  btnCamToggle.addEventListener("click", async () => {
+    await setCameraEnabled(!state.settings.cameraEnabled);
+  });
+
+  // Main time controls
+  useNowMain.addEventListener("change", () => {
+    state.settings.useNow = useNowMain.checked;
+    useNow.checked = state.settings.useNow;
+    updateTimeUI();
+    scheduleSaveSettings();
+  });
+  customTimeMain.addEventListener("input", () => {
+    state.settings.customTime = customTimeMain.value || "";
+    customTime.value = state.settings.customTime;
+    updateTimeUI();
+    scheduleSaveSettings();
+  });
+
+  // Settings time controls
+  useNow.addEventListener("change", () => {
+    state.settings.useNow = useNow.checked;
+    useNowMain.checked = state.settings.useNow;
+    updateTimeUI();
+    scheduleSaveSettings();
+  });
+  customTime.addEventListener("input", () => {
+    state.settings.customTime = customTime.value || "";
+    customTimeMain.value = state.settings.customTime;
+    updateTimeUI();
+    scheduleSaveSettings();
+  });
+
+  timeFormat.addEventListener("change", () => {
+    state.settings.timeFormat = timeFormat.value;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+
+  // Output + guide update
+  outputMode.addEventListener("change", () => {
+    state.settings.outputMode = outputMode.value;
+    updateOutputUI();
+    scheduleSaveSettings();
+    updatePresetGuide();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  outputSize.addEventListener("change", () => {
+    state.settings.outputSize = outputSize.value;
+    updateOutputUI();
+    scheduleSaveSettings();
+    updatePresetGuide();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  fitMode.addEventListener("change", () => {
+    state.settings.fitMode = fitMode.value;
+    updateOutputUI();
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+
+  // Overlay
+  overlayPos.addEventListener("change", () => {
+    state.settings.overlayPos = overlayPos.value;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  overlayPad.addEventListener("input", () => {
+    state.settings.overlayPad = Number(overlayPad.value) || 24;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  fontAuto.addEventListener("change", () => {
+    state.settings.fontAuto = fontAuto.checked;
+    updateOverlayUI();
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  fontScale.addEventListener("input", () => {
+    state.settings.fontScale = Number(fontScale.value) || 100;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  fontPx.addEventListener("input", () => {
+    state.settings.fontPx = Number(fontPx.value) || 32;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+
+  // Location
+  enableLocation.addEventListener("change", async () => {
+    state.settings.enableLocation = enableLocation.checked;
+    scheduleSaveSettings();
+    await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  showLatLng.addEventListener("change", async () => {
+    state.settings.showLatLng = showLatLng.checked;
+    scheduleSaveSettings();
+    await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  showAddress.addEventListener("change", async () => {
+    state.settings.showAddress = showAddress.checked;
+    scheduleSaveSettings();
+    await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+
+  latEl.addEventListener("input", async () => {
+    state.settings.lat = latEl.value || "";
+    state.addressText = "";
+    scheduleSaveSettings();
+    await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  lngEl.addEventListener("input", async () => {
+    state.settings.lng = lngEl.value || "";
+    state.addressText = "";
+    scheduleSaveSettings();
+    await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  placeQuery.addEventListener("input", () => {
+    state.settings.placeQuery = placeQuery.value || "";
+    scheduleSaveSettings();
+  });
+
+  btnUseGPS.addEventListener("click", async () => {
+    state.settings.enableLocation = true;
+    enableLocation.checked = true;
+    scheduleSaveSettings();
+
+    if (!navigator.geolocation){
+      locStatus.textContent = "อุปกรณ์/เบราว์เซอร์นี้ไม่รองรับ GPS";
+      showToast("GPS ไม่รองรับ");
+      return;
+    }
+
+    locStatus.textContent = "กำลังขอพิกัดจาก GPS…";
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      latEl.value = pos.coords.latitude;
+      lngEl.value = pos.coords.longitude;
+      state.settings.lat = latEl.value;
+      state.settings.lng = lngEl.value;
+      state.addressText = "";
+      scheduleSaveSettings();
+      await refreshAddressIfNeeded();
+      if (previewBackdrop.style.display === "flex") renderPreview();
+    }, (err) => {
+      locStatus.textContent = "ขอพิกัดไม่ได้: " + (err?.message || "unknown");
+      showToast("ขอ GPS ไม่สำเร็จ");
+      addLog("geolocation error: " + String(err?.message||err));
+    }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+  });
+
+  btnOpenMap.addEventListener("click", () => {
+    state.settings.enableLocation = true;
+    enableLocation.checked = true;
+    scheduleSaveSettings();
+    openMap();
+  });
+
+  btnSearchPlace.addEventListener("click", async () => {
+    const q = (placeQuery.value || "").trim();
+    if (!q) return;
+
+    state.settings.enableLocation = true;
+    enableLocation.checked = true;
+    scheduleSaveSettings();
+
+    locStatus.textContent = "กำลังค้นหาสถานที่…";
+    try{
+      const r = await forwardGeocode(q);
+      if (!r){
+        locStatus.textContent = "ไม่พบสถานที่";
+        showToast("ไม่พบสถานที่");
+        return;
+      }
+      latEl.value = r.lat;
+      lngEl.value = r.lng;
+      state.settings.lat = latEl.value;
+      state.settings.lng = lngEl.value;
+      state.addressText = r.display_name || "";
+      scheduleSaveSettings();
+      await refreshAddressIfNeeded();
+
+      if (state.map && window.L){
+        state.map.setView([r.lat, r.lng], 17);
+        state.marker?.setLatLng([r.lat, r.lng]);
+      }
+      if (previewBackdrop.style.display === "flex") renderPreview();
+    } catch (e){
+      locStatus.textContent = "ค้นหาไม่สำเร็จ (แนะนำเปิดผ่าน https)";
+      showToast("ค้นหาไม่สำเร็จ");
+      addLog("forwardGeocode failed: " + String(e?.message||e));
+    }
+  });
+
+  btnCloseMap.addEventListener("click", closeMap);
+  btnCancelMap.addEventListener("click", closeMap);
+  btnConfirmMap.addEventListener("click", confirmMap);
+
+  // Preview modal
+  btnClosePreview.addEventListener("click", closePreview);
+  previewBackdrop.addEventListener("click", (e) => { if (e.target === previewBackdrop) closePreview(); });
+
+  photoTimeNow.addEventListener("click", () => setPhotoTimeMode("now"));
+  photoTimeCustom.addEventListener("click", () => setPhotoTimeMode("custom"));
+  photoCustomTime.addEventListener("input", () => {
+    const p = getSelectedPhoto();
+    if (!p) return;
+    if (p.timeMode !== "custom") return;
+    const v = photoCustomTime.value;
+    const d = v ? new Date(v) : new Date();
+    p.timeValueISO = d.toISOString();
+
+    // ✅ persist
+    idbPutPhoto({
+      id: p.id,
+      baseBlob: p.baseBlob,
+      w: p.w,
+      h: p.h,
+      createdAtISO: p.createdAtISO,
+      timeMode: p.timeMode,
+      timeValueISO: p.timeValueISO,
+      sourceName: p.sourceName,
+      fromFrontMirror: p.fromFrontMirror
+    }).catch(e => addLog("idb update time failed: " + String(e?.message||e)));
+
+    renderPreview();
+  });
+
+  dlType.addEventListener("change", () => {
+    dlQuality.disabled = (dlType.value === "image/png");
+  });
+
+  btnDownloadOne.addEventListener("click", async () => {
+    const p = getSelectedPhoto();
+    if (!p) return;
+    await downloadPhoto(p);
+  });
+
+  btnDeleteOne.addEventListener("click", () => {
+    const p = getSelectedPhoto();
+    if (!p) return;
+    if (confirm("ลบรูปนี้?")){
+      const id = p.id;
+      closePreview();
+      deletePhoto(id);
+    }
+  });
+
+  // Log
+  enableLogPanel.addEventListener("change", () => {
+    state.settings.enableLogPanel = enableLogPanel.checked;
+    updateLogUI();
+    scheduleSaveSettings();
+  });
+  btnClearLog.addEventListener("click", () => {
+    logs.length = 0;
+    if (enableLogPanel.checked) logPre.textContent = "";
+    addLog("log cleared");
+    showToast("ล้าง Log แล้ว");
+  });
+  btnCopyLog.addEventListener("click", async () => {
+    try{
+      await navigator.clipboard.writeText(logs.join("\n"));
+      showToast("Copy Log แล้ว");
+    } catch {
+      showToast("Copy ไม่ได้");
+    }
+  });
+
+  btnResetSettings.addEventListener("click", () => {
+    if (!confirm("Reset Settings?")) return;
+    state.settings = {...DEFAULT_SETTINGS};
+    applySettingsToUI();
+    scheduleSaveSettings();
+    showToast("Reset แล้ว");
+  });
+
+  btnDeleteAllInSettings.addEventListener("click", () => {
+    if (state.photos.length === 0) return;
+    if (confirm("ลบรูปทั้งหมดใน session นี้?")) deleteAllPhotos();
+  });
+
+  // close settings/map when click outside
+  settingsBackdrop.addEventListener("click", (e) => { if (e.target === settingsBackdrop) closeBackdrop(settingsBackdrop); });
+  mapBackdrop.addEventListener("click", (e) => { if (e.target === mapBackdrop) closeMap(); });
+
+  window.addEventListener("beforeunload", () => { try{ stopCamera(); }catch{} });
+
+  /* Boot */
+  addLog("boot camera-first (locked no page scroll; gallery only horizontal)");
+  applySettingsToUI();
+
+  // ✅ restore photos from IndexedDB first
+  await restorePhotosFromIDB();
+  updateGallery();
+  updateButtons();
+
+  dlQuality.disabled = (dlType.value === "image/png");
+
+  // ✅ start camera only if enabled
+  if (state.settings.cameraEnabled){
+    await startCamera({ facingMode: state.cam.facingMode });
+  } else {
+    vfHint.textContent = "กล้องปิดอยู่ (เปิดจาก toggle ซ้ายบน) — ยังสามารถ Import รูปได้";
+  }
+
+  refreshAddressIfNeeded().catch(() => {});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2474 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#10b981" />
+  <title>PT Report Tool (Mint)</title>
+
+  <style>
+    :root{
+      --bg:#f6fffb;
+      --card:#ffffff;
+      --line:#d7efe7;
+      --text:#0f172a;
+      --muted:#475569;
+      --muted2:#64748b;
+      --accent:#10b981;
+      --soft:#eafff6;
+      --soft2:#f0fffa;
+      --danger:#ef4444;
+      --warn:#f59e0b;
+      --shadow:0 10px 28px rgba(2, 6, 23, .08);
+      --radius:18px;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif;
+      padding:14px 14px calc(18px + env(safe-area-inset-bottom));
+    }
+    .wrap{ max-width:1040px; margin:0 auto; display:grid; gap:12px; }
+    body.history-only{ padding:0; }
+    body.history-only .wrap{ max-width:none; min-height:100vh; display:block; }
+    body.history-only header,
+    body.history-only .card:not(#historyCard),
+    body.history-only .stickyBar{ display:none; }
+    body.history-only #historyCard{
+      min-height:100vh;
+      margin:0;
+      border:0;
+      border-radius:0;
+      box-shadow:none;
+    }
+    #btnHistorySummary{ display:none; }
+    body.history-only #btnHistorySummary{ display:inline-flex; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      padding:6px 4px;
+    }
+    h1{
+      margin:0;
+      font-size:18px;
+      font-weight:950;
+      letter-spacing:.2px;
+      line-height:1.2;
+    }
+    .sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid var(--line);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:850;
+      user-select:none;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:12px;
+      box-shadow:var(--shadow);
+    }
+    .label{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+      font-weight:900;
+    }
+    .muted{
+      color:var(--muted2);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .mini{
+      font-size:12px;
+      color:var(--muted2);
+      margin-top:6px;
+      line-height:1.35;
+      white-space:pre-line;
+    }
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+    @media (max-width: 820px){ .grid3{ grid-template-columns:1fr; } }
+    @media (max-width: 720px){ .grid2{ grid-template-columns:1fr; } }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row.between{ justify-content:space-between; }
+    .field{
+      width:100%;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--text);
+      padding:12px 12px;
+      font-size:15px;
+      outline:none;
+    }
+    textarea.field{ min-height:124px; resize:vertical; }
+    .field:focus{
+      border-color:rgba(16,185,129,.55);
+      box-shadow:0 0 0 4px rgba(16,185,129,.16);
+    }
+    .btn{
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--text);
+      padding:12px 12px;
+      border-radius:14px;
+      font-size:15px;
+      font-weight:950;
+      cursor:pointer;
+      min-height:46px;
+      box-shadow:0 8px 18px rgba(2, 6, 23, .06);
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      white-space:nowrap;
+    }
+    .btn:active{ transform:translateY(1px); }
+    .btn.primary{
+      background:linear-gradient(135deg, rgba(16,185,129,.95), rgba(16,185,129,.70));
+      border-color:rgba(16,185,129,.55);
+      color:#053b2a;
+    }
+    .btn.soft{
+      background:var(--soft);
+      border-color:rgba(16,185,129,.30);
+      color:#064e3b;
+    }
+    .btn.copy-line{
+      background:#047857;
+      border-color:#065f46;
+      color:#fff;
+    }
+    .btn.copy-only{
+      background:#e5e7eb;
+      border-color:#d1d5db;
+      color:#374151;
+    }
+    .btn.save-local{
+      background:#d1fae5;
+      border-color:#86efac;
+      color:#065f46;
+    }
+    .reportActions{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:10px;
+    }
+    .reportActions .btn{
+      min-width:0;
+      padding:10px 8px;
+      font-size:clamp(12px, 3.4vw, 15px);
+      white-space:normal;
+    }
+    .btn.danger{
+      background:rgba(239,68,68,.12);
+      border-color:rgba(239,68,68,.35);
+      color:#7f1d1d;
+    }
+    .btn.warn{
+      background:rgba(245,158,11,.10);
+      border-color:rgba(245,158,11,.35);
+      color:#7c2d12;
+    }
+    .btn[disabled]{ opacity:.45; cursor:not-allowed; transform:none; }
+    .switch{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      user-select:none;
+      min-height:46px;
+    }
+    .switch input{ width:20px; height:20px; accent-color:var(--accent); }
+    .switch span{ font-size:15px; font-weight:900; color:var(--text); }
+    .hr{ height:1px; background:var(--line); margin:10px 0; }
+    .stickyBar{
+      position:sticky;
+      bottom:10px;
+      z-index:10;
+      display:grid;
+      gap:10px;
+      padding:10px;
+      background:rgba(246,255,251,.88);
+      backdrop-filter:blur(8px);
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+    }
+    .previewBox{
+      border:1px solid rgba(2,6,23,.10);
+      background:#fff;
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .previewHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      background:rgba(16,185,129,.06);
+      border-bottom:1px solid rgba(2,6,23,.08);
+    }
+    .previewTitle{
+      font-weight:950;
+      font-size:13px;
+      color:#064e3b;
+    }
+    pre{
+      margin:0;
+      padding:10px 12px;
+      font-size:13px;
+      line-height:1.4;
+      color:#0f172a;
+      white-space:pre-wrap;
+      word-break:break-word;
+      max-height:360px;
+      overflow:auto;
+    }
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:950;
+      border:1px solid var(--line);
+      background:#fff;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+    }
+    .badge.ok{ border-color:rgba(16,185,129,.35); background:rgba(16,185,129,.08); color:#065f46; }
+    .badge.wait{ border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.10); color:#7c2d12; }
+    .badge.err{ border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.10); color:#7f1d1d; }
+    .statusBar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .countWrap{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .skuLegend{
+      margin-top:2px;
+      margin-bottom:10px;
+      color:var(--muted2);
+      font-size:12px;
+      line-height:1.4;
+    }
+    .skuBoard{ display:grid; gap:12px; }
+    .skuSection{
+      border:1px solid rgba(2,6,23,.08);
+      border-radius:16px;
+      background:#fbfffd;
+      overflow:hidden;
+    }
+    .skuSectionHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      background:rgba(16,185,129,.08);
+      border-bottom:1px solid rgba(2,6,23,.06);
+    }
+    .skuSectionHead strong{
+      font-size:14px;
+      font-weight:950;
+      color:#064e3b;
+    }
+    .skuSectionMeta{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .skuList{
+      display:grid;
+      gap:8px;
+      padding:10px;
+    }
+    .skuRow{
+      display:grid;
+      grid-template-columns:92px minmax(0, 1fr) auto;
+      gap:10px;
+      align-items:center;
+      padding:10px;
+      border-radius:14px;
+      border:1px solid rgba(2,6,23,.08);
+      background:#fff;
+    }
+    .skuFlag{
+      min-width:0;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:#0f172a;
+      padding:10px 8px;
+      font-size:14px;
+      font-weight:900;
+      outline:none;
+    }
+    .skuFlag:focus{
+      border-color:rgba(16,185,129,.55);
+      box-shadow:0 0 0 4px rgba(16,185,129,.16);
+    }
+    .skuTitle{
+      font-size:14px;
+      line-height:1.3;
+      font-weight:850;
+      color:#0f172a;
+      min-width:0;
+      overflow-wrap:anywhere;
+    }
+    .skuCheckWrap{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid rgba(16,185,129,.20);
+      background:rgba(16,185,129,.06);
+      user-select:none;
+      justify-self:end;
+      cursor:pointer;
+    }
+    .skuCheckWrap input{
+      width:20px;
+      height:20px;
+      accent-color:var(--accent);
+      margin:0;
+    }
+    .skuRow.sku-disabled{
+      background:rgba(239,68,68,.05);
+      border-color:rgba(239,68,68,.16);
+    }
+    .skuRow.sku-disabled .skuTitle{ color:#7f1d1d; }
+    .skuRow.sku-disabled .skuCheckWrap{
+      border-color:rgba(239,68,68,.18);
+      background:rgba(239,68,68,.08);
+    }
+    .skuRow[hidden]{ display:none; }
+    .summaryTopicHint{
+      margin:2px 0 10px;
+      color:var(--muted2);
+      font-size:12px;
+      line-height:1.4;
+    }
+    .summaryTopicList{
+      display:grid;
+      gap:8px;
+      margin-bottom:14px;
+    }
+    .summaryTopicItem{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(2,6,23,.08);
+      background:#fff;
+    }
+    .summaryTopicItem input{
+      width:18px;
+      height:18px;
+      margin:0;
+      flex:0 0 auto;
+      accent-color:var(--accent);
+    }
+    .summaryTopicLabel{
+      font-size:14px;
+      line-height:1.35;
+      font-weight:850;
+      color:#0f172a;
+    }
+    .readonlyChip{
+      display:flex;
+      align-items:center;
+      min-height:46px;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:var(--soft2);
+      color:#064e3b;
+      font-size:15px;
+      font-weight:900;
+    }
+    .histTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .histList{ display:grid; gap:10px; margin-top:10px; }
+    .histItem{
+      border:1px solid rgba(2,6,23,.10);
+      background:#fff;
+      border-radius:16px;
+      padding:10px;
+      box-shadow:0 8px 18px rgba(2,6,23,.05);
+    }
+    .histRow{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .histLeft{ display:flex; gap:10px; align-items:flex-start; }
+    .histMain{ display:grid; gap:2px; }
+    .histTitle{
+      font-weight:950;
+      font-size:14px;
+      color:#0f172a;
+      line-height:1.25;
+    }
+    .histMeta{ font-size:12px; color:var(--muted2); line-height:1.25; }
+    .histActions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .histActions .btn{ min-height:40px; padding:9px 10px; font-size:13px; }
+    .check{
+      width:22px;
+      height:22px;
+      margin-top:2px;
+      accent-color:var(--accent);
+    }
+    .toast{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:calc(18px + env(safe-area-inset-bottom));
+      background:rgba(15, 23, 42, .92);
+      color:#fff;
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:13px;
+      font-weight:850;
+      box-shadow:0 14px 40px rgba(2,6,23,.30);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .18s ease, transform .18s ease;
+      z-index:999;
+      max-width:min(520px, calc(100vw - 24px));
+      text-align:center;
+      white-space:pre-wrap;
+    }
+    .toast.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(-6px);
+    }
+    .modalBack{
+      position:fixed;
+      inset:0;
+      background:rgba(2,6,23,.60);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+      z-index:1000;
+    }
+    .modal{
+      width:min(520px, 100%);
+      background:#fff;
+      border-radius:18px;
+      border:1px solid var(--line);
+      box-shadow:0 18px 55px rgba(2,6,23,.28);
+      overflow:hidden;
+    }
+    .modalHeader{
+      padding:12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      border-bottom:1px solid var(--line);
+      background:var(--soft2);
+    }
+    .modalTitle{
+      font-weight:950;
+      font-size:14px;
+      color:#064e3b;
+    }
+    .modalBody{ padding:12px; display:grid; gap:10px; }
+    .modalText{ font-size:14px; color:var(--text); line-height:1.35; white-space:pre-line; }
+    .modalFoot{ padding:12px; display:grid; gap:10px; border-top:1px solid var(--line); }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>PT Report Script Tool (Mint)</h1>
+        <div class="sub">แพทเทิร์นรายงาน CVS 20 • เช็ก SKU แบบ ✅/⭐/❌ • เก็บประวัติ COPY และเปิด LINE กลุ่มได้ต่อเนื่อง</div>
+      </div>
+      <span class="pill">☀️ โหมดกลางแดด</span>
+    </header>
+
+    <div class="card">
+      <div class="label">1) ข้อมูลสาขา</div>
+
+      <div class="grid2">
+        <div>
+          <div class="label">วันที่</div>
+          <input id="reportDate" class="field" type="date" />
+        </div>
+
+        <div>
+          <div class="label">แอคเคาท์</div>
+          <select id="account" class="field">
+            <option value="" selected>— เลือกแอคเคาท์ —</option>
+            <option value="CJ MORE">CJ MORE</option>
+            <option value="LAWSON">LAWSON</option>
+            <option value="MINI BIG C">MINI BIG C</option>
+            <option value="VILLA MARKET">VILLA MARKET</option>
+            <option value="LOTUS'S GO FRESH">LOTUS'S GO FRESH</option>
+            <option value="JIFFY">JIFFY</option>
+            <option value="7-ELEVEN">7-ELEVEN</option>
+            <option value="TOPS DAILY">TOPS DAILY</option>
+          </select>
+          <div class="mini">กด COPY แล้วจะเปิดลิงก์ LINE ของกลุ่มตามแอคเคาท์ให้ทันที</div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px">
+        <div>
+          <div class="label">รหัสสาขา</div>
+          <input id="branchCode" class="field" placeholder="-" />
+        </div>
+        <div>
+          <div class="label">ชื่อสาขา</div>
+          <input id="branchName" class="field" placeholder="-" />
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px">
+        <div>
+          <div class="label">สาขาตั้งอยู่บริเวณ</div>
+          <select id="locationArea" class="field"></select>
+        </div>
+        <div>
+          <div class="label">กลุ่มลูกค้า</div>
+          <div id="customerGroup" class="readonlyChip">ทั่วไป</div>
+          <div class="mini">ค่าคงที่ตามแพทเทิร์นใหม่</div>
+        </div>
+      </div>
+
+      <div class="statusBar">
+        <div class="countWrap">
+          <span class="badge ok" id="smeCountBadge">สินค้า SME : มีสินค้า 0 รายการ</span>
+          <span class="badge ok" id="denCountBadge">สินค้า DEN : มีสินค้า 0 รายการ</span>
+        </div>
+        <div class="row" style="gap:8px">
+          <span class="badge wait" id="statusBadge">⏳ พร้อม</span>
+          <button class="btn warn" id="btnResetForm">♻️ ล้างฟอร์ม</button>
+        </div>
+      </div>
+      <div class="mini" id="statusText">ตั้งค่า ⭐/❌ จะมีผลกับทุกร้านใน browser นี้ • จำนวนสินค้า SME/DEN จะนับจากรายการที่ติ๊ก ✅ เท่านั้น</div>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <div class="label" style="margin-bottom:0">2) เช็กสินค้า</div>
+        <span class="badge wait">dropdown หน้า SKU: ว่าง / ⭐ / ❌</span>
+      </div>
+      <div class="skuLegend">`⭐` คือสินค้าโฟกัสประจำเดือน, `❌` คือสินค้าที่งดเช็กทั้งเดือนและจะติ๊ก ✅ ไม่ได้, ปล่อยว่างคือสินค้ายังเช็กได้ตามปกติ</div>
+
+      <div id="skuBoard" class="skuBoard">
+        <section class="skuSection">
+          <div class="skuSectionHead">
+            <strong>รายการสินค้า (ตามลิสต์หลัก)</strong>
+            <div class="skuSectionMeta">
+              <span class="badge ok" id="smeCountMini">SME 0 รายการ</span>
+              <span class="badge ok" id="denCountMini">DEN 0 รายการ</span>
+            </div>
+          </div>
+          <div id="skuListAll" class="skuList"></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">3) ข้อมูลเพิ่มเติม</div>
+
+      <div class="label">🧾 หัวข้อสรุปท้ายงาน</div>
+      <div class="summaryTopicHint">ติ๊กเฉพาะร้านที่ต้องการให้ไปอยู่ในสรุปงานท้ายวันแบบแยกหมวด</div>
+      <div id="summaryTopicList" class="summaryTopicList"></div>
+
+      <div class="grid2">
+        <div>
+          <div class="label">⛔ ปัญหาที่พบ</div>
+          <textarea id="issue" class="field" placeholder="พิมพ์ปัญหาที่พบ"></textarea>
+        </div>
+        <div>
+          <div class="label">หมายเหตุ</div>
+          <textarea id="note" class="field" placeholder="ใช้ช่องนี้สำหรับสื่อโปรโมชั่น ป้ายสินค้าใหม่ ป้ายขายดี Sticker ลิซ่า และชั้นวางสินค้า"></textarea>
+          <div class="mini">ตัวอย่าง: &#10;🪧สื่อโปรโมชั่น ...&#10;🪧ป้ายสินค้าใหม่ ...&#10;⭐ Sticker ลิซ่า : ✔️&#10;🗄️ชั้นวางสินค้า ...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="previewSection">
+      <div class="label">4) พรีวิวสคริป (จะคัดลอกแบบนี้)</div>
+      <div class="previewBox">
+        <div class="previewHeader">
+          <div class="previewTitle">Output Preview</div>
+        </div>
+        <pre id="preview"></pre>
+      </div>
+    </div>
+
+    <div class="card" id="historyCard">
+      <div class="label">5) ประวัติ (รายการที่ COPY วันนี้)</div>
+
+      <div class="histTop">
+        <div class="row" style="gap:8px">
+          <span class="badge ok" id="histCount">0 รายการ</span>
+          <span class="muted" id="histHint">ติ๊กช่องหน้ารายการ เพื่อใช้ “สรุปยอดรายวัน”</span>
+        </div>
+
+        <div class="row" style="gap:8px">
+          <button class="btn primary" id="btnHistorySummary">🧾 สรุปยอด (จากที่ติ๊ก)</button>
+          <button class="btn soft" id="btnSelectAll">เลือกทั้งหมด</button>
+          <button class="btn" id="btnToggleAll">ดูทั้งหมด</button>
+          <button class="btn danger" id="btnClearAll">ล้างประวัติทั้งหมด</button>
+        </div>
+      </div>
+
+      <div class="histList" id="histList"></div>
+      <div class="mini">ค่าเริ่มต้นจะแสดงเฉพาะรายการที่ COPY วันนี้ • กด “ดูทั้งหมด” เพื่อเปิดประวัติเก่า • สรุปยอดจะเรียง “เก่าก่อน → ใหม่สุด”</div>
+    </div>
+
+    <div class="stickyBar" id="stickyBar">
+      <div class="reportActions">
+        <button class="btn copy-line" id="btnCopy">COPY to LINE</button>
+        <button class="btn copy-only" id="btnCopyOnly">COPY</button>
+        <button class="btn save-local" id="btnSave">SAVE</button>
+      </div>
+      <button class="btn soft" id="btnSummary" style="width:100%; margin-top:10px">🧾 สรุปยอด (จากที่ติ๊ก) + เปิด LINE สรุป</button>
+      <div class="muted">
+        • รูปแบบสคริป: วันที่(พ.ศ.2หลัก) + CVS: 20 + รายละเอียดร้าน + SKU แบบ ✅/⭐/❌<br>
+        • สรุปยอด: “สรุปงาน วันที่ dd/mm/yyyy” + “CVS 20” + ลิสต์ 1..n
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modalBack" id="modalBack" aria-hidden="true">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="modalTitle" id="modalTitle">ยืนยัน</div>
+        <button class="btn danger" id="modalClose" style="min-height:40px; padding:9px 10px; font-size:13px;">ปิด</button>
+      </div>
+      <div class="modalBody">
+        <div class="modalText" id="modalText">-</div>
+      </div>
+      <div class="modalFoot">
+        <div class="grid2">
+          <button class="btn danger" id="modalYes">ยืนยัน</button>
+          <button class="btn" id="modalNo">ยกเลิก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const QUERY = new URLSearchParams(location.search);
+  const EMBED = QUERY.get("embed") === "1";
+  const HISTORY_MODE = QUERY.get("history") === "1" || location.hash === "#history";
+
+  const LEGACY_STORE_FORM = "PT_REPORT_FORM_V1";
+  // Popup and the standalone page have different drafts, so opening a store report never clears the standalone draft.
+  const STORE_FORM = EMBED ? "PT_REPORT_FORM_EMBED_V1" : "PT_REPORT_FORM_DIRECT_V2";
+  const STORE_HISTORY = "PT_REPORT_HISTORY_V1";
+  const STORE_UI = "PT_REPORT_UI_V1";
+  const STORE_SKU_GLOBAL = "PT_REPORT_SKU_GLOBAL_V1";
+  const SKU_GLOBAL_PRESET_VERSION = "2026-07-14-order-v2";
+  const STORAGE_CACHE_PREFIX = "PT_GBKK_PLACES_CACHE_";
+  const MAX_HISTORY_ITEMS = 240;
+  const HISTORY_DUPLICATE_WINDOW_MS = 5000;
+
+  const TEAM_REPORT = "CVS: 20";
+  const TEAM_SUMMARY = "CVS 20";
+  const FIXED_CUSTOMER_GROUP = "ทั่วไป";
+  const REPORT_DATE_MODE_AUTO = "auto";
+  const REPORT_DATE_MODE_MANUAL = "manual";
+  const MONTHLY_FLAG_NONE = "";
+  const MONTHLY_FLAG_FOCUS = "focus";
+  const MONTHLY_FLAG_SKIP = "skip";
+  const DEFAULT_ISSUE_TEMPLATE = [
+    "- ฝากสั่งสินค้าเรียบร้อย",
+    "- จัดเรียงหันหน้าตัวสินค้าและทำความสะอาดสินค้าและชั้นวางเรียบร้อย",
+    "- สาขาติดป้ายสื่อโปรโมชั่นเรียบร้อย"
+  ].join("\n");
+  const DEFAULT_NOTE_TEMPLATE = [
+    "🪧สื่อโปรโมชั่น",
+    "⭐SME โฟมขาวไวท์ 1oz : ",
+    "⭐SME โฟโฟมเขียวเบบี้เฟช.5oz : ",
+    "⭐SME ครีมพลัสไวท์ 10 g : ",
+    "",
+    "🪧ป้ายสินค้าใหม่",
+    "- งดติดชั่วคราว",
+    "",
+    "🪧ป้ายขายดี",
+    "- งดติดชั่วคราว",
+    "",
+    "⭐ Sticker ลิซ่า : ✔️",
+    "",
+    "🗄️ชั้นวางสินค้า (นับจากชั้นล่างขึ้นบน)",
+    "- สินค้า DEN อยู่ชั้น : 4",
+    "- สินค้า SME อยู่ชั้น :4"
+  ].join("\n");
+
+  const LOCATION_OPTIONS = [
+    "ชุมชน",
+    "ปั้มน้ำมัน",
+    "ติด/ใกล้กับตลาด",
+    "โรงแรม/สถานที่ท่องเที่ยว",
+    "โรงเรียน/มหาวิทยาลัย(สถานศึกษา)",
+    "โรงพยาบาล",
+    "ตีกสำนังาน",
+    "สถานที่ราชการ",
+    "ภายในตลาด",
+    "ห้างสรรพสินค้า",
+    "สถานที่ใกล้ขนส่ง"
+  ];
+
+  const SUMMARY_TOPICS = [
+    { id: "brush_advanced_b1g1", label: "⛔สรุปแปรงแอดวานซ์ 1แถม1" },
+    { id: "brush_pack3_b1g1", label: "⛔สรุปแปรงแพ็ค3 1แถม1" },
+    { id: "acne_scar_5g_b1g1", label: "⛔สรุปแอคเน่สการ์5G 1แถม1" },
+    { id: "acne_gel_5g_b1g1", label: "⛔สรุปเจลแต้มสิว5G 1แถม1" },
+    { id: "travel_brush_set_b1g1", label: "⛔สรุปแปรงชุดเดินทาง 1แถม1" },
+    { id: "floss_b1g1", label: "⛔สรุปไหมขัดฟัน 1แถม1" },
+    { id: "dentiste_max_45g_b1g1", label: "⛔สรุปเดนทิสเต้ MAX 45G 1แถม1" }
+  ];
+
+  const SKU_ITEMS = [
+    { id: "sme_foam_baby_face_2oz", label: "SME โฟมเบบี้เฟช 2oz", family: "SME" },
+    { id: "sme_foam_green_baby_face_1_2oz", label: "SME โฟมเขียวเบบี้เฟช 1.2oz", family: "SME" },
+    { id: "sme_baby_face_gel_1_5oz", label: "SME เบบี้เฟชเจลล้างหน้า 1.5oz", family: "SME" },
+    { id: "sme_white_foam_1oz", label: "SME โฟมขาวไวท์ 1oz", family: "SME" },
+    { id: "sme_green_foam_0_5oz", label: "SME โฟมเขียวเบบี้เฟช 0.5oz", family: "SME" },
+    { id: "sme_cleansing_water_80ml", label: "SME คลีนซิ่งวอเทอร์ 80ml", family: "SME" },
+    { id: "sme_green_cream_10g", label: "SME ครีมเขียว 10g", family: "SME" },
+    { id: "sme_plus_white", label: "SME ครีมพลัสไวท์", family: "SME" },
+    { id: "sme_new_skin_liquid_plaster", label: "SME นิวสกินลิควิดพลาสเตอร์", family: "SME" },
+    { id: "sme_acne_gel_7g", label: "SME เจลแต้มสิว 7G", family: "SME" },
+    { id: "sme_acne_gel_5g_sachet", label: "SME เจลแต้มสิว 5G (แบบซอง)", family: "SME" },
+    { id: "den_floss", label: "DENไหมขัดฟัน", family: "DEN" },
+    { id: "den_tube_50g", label: "DEN เดนทิสเต้ทูป 50G", family: "DEN" },
+    { id: "den_travel_set", label: "DEN ชุดเดินทาง", family: "DEN" },
+    { id: "den_tube_100g", label: "DEN เดนทิสเต้ทูป 100G", family: "DEN" },
+    { id: "den_sensitive_100g", label: "DEN เดนทิสเต้เซนซิทีฟ 100G", family: "DEN" },
+    { id: "den_italy_3_action_80", label: "DEN แปรง ITALY 3 แอ็คชั่น(80 บาท)", family: "DEN" },
+    { id: "den_oral_care_set", label: "DEN ชุดอุปกรณ์ดูแลช่องปาก", family: "DEN" },
+    { id: "den_tube_set_90x90g", label: "DEN เดนทิสเต้ทูปเซ็ท 90*90G", family: "DEN" },
+    { id: "den_premium_care_50g", label: "DEN เดนทิสเต้พรีเมี่ยมแคร์ 50G", family: "DEN" },
+    { id: "den_brush_pack_3", label: "DEN แปรงแพ็ค 3", family: "DEN" },
+    { id: "den_mouth_spray", label: "DEN สเปรย์ระงับกลิ่นปาก", family: "DEN" },
+    { id: "den_quality_max_45g", label: "DEN เดนทิสเต้ควาวิตี้แม็ก 45G", family: "DEN" },
+    { id: "den_goodnight_pastel", label: "DEN แปรงกู๊ดไนท์พาสเทล", family: "DEN" },
+    { id: "den_floss_pick_40", label: "DEN ด้ามไหมขัดฟัน40ชิ้น", family: "DEN" },
+    { id: "den_sukiri_candy", label: "DEN ลูกอมสุกิริ", family: "DEN" },
+    { id: "den_proskin_6_capsules", label: "DEN โปรสกิน 6 แคปซูล", family: "DEN" },
+    { id: "den_proskin_12_capsules", label: "DEN โปรสกิน 12 แคปซูล", family: "DEN" },
+    { id: "den_tube_set_160g_p3", label: "DEN เดนทิสเต้ทูปเซ็ท 160G*P.3", family: "DEN" },
+    { id: "sme_acne_scar_5g_sachet", label: "SME แอคเน่สการ์ 5G (ซอง)", family: "SME" },
+    { id: "den_valentine_100g", label: "DEN เดนทิสเต้วาเลนไทน์100G", family: "DEN" },
+    { id: "sme_acne_sun_5g_sachet", label: "SME สมูทอีแอคเน่ซัน 5G. (ซอง)", family: "SME" },
+    { id: "sme_white_cream_5g_sachet", label: "SME ไวท์ครีม 5G. (ซอง)", family: "SME" },
+    { id: "sme_white_baby_face_spot_clear_40ml", label: "SME ไวท์เบบี้เฟซสปอตเคลียร์ 40 มล.", family: "SME" },
+    { id: "sme_gold_cream_5g_sachet", label: "SME โกล์ดครีม 5G. (ซอง)", family: "SME" },
+    { id: "sme_green_foam_new", label: "โฟมเขียวใหม่", family: "SME" },
+    { id: "den_advanced_care_new", label: "DEN แปรงสีฟันแอดวานซ์แคร์ (NEW)", family: "DEN" },
+    { id: "den_premium_natural_white_50g", label: "DEN เดนทิสเต้พรีเมี่ยม&แนทเชอรัลไวท์ 50 g", family: "DEN" },
+    { id: "den_extra_strong_mint_100g", label: "DEN เดนทิสเต้เอ็กซ์ตร้าสตรองมินต์ 100 g.", family: "DEN" },
+    { id: "sme_gluta_b3_5g_sachet", label: "SME สมูทอี กลูต้า บี3. 5G. (ซอง)", family: "SME" },
+    { id: "sme_hya_filler_serum_5g_sachet", label: "SME สมูทอีไฮยา ฟิลเลอร์ เซรั่ม 5G. (ซอง)", family: "SME" },
+    { id: "sme_radiant_glow_30ml_sachet", label: "SMEสมูทอี เรเดียนท์ โกลว์ 30 มล. (ซอง)", family: "SME" },
+    { id: "sme_sun_zero_feel_5g_new", label: "SME สมูทอี ซัน ซีโร่ ฟีล ซ่าเช่ 5 กรัม (NEW)", family: "SME" },
+    { id: "den_whitening_purple_100g_new", label: "DEN ไวท์เทนนิ่ง เพอร์เพิล 100 กรัม (NEW)", family: "DEN" },
+    { id: "den_whitening_purple_sachet_10g_new", label: "DEN ไวท์เทนนิ่ง เพอร์เพิล ซ่าเช่ 10 กรัม (NEW)", family: "DEN" },
+    { id: "sme_baby_face_acne_5_detoxify_new", label: "SME โฟมเบบี้เฟซ แอคเน่-5 ดีท็อกซิฟาย (NEW)", family: "SME", accounts: ["7-ELEVEN"] },
+    { id: "sme_acne_cleansing_serum_80ml_new", label: "SME คลีนซิ่งแอคเน่ เซรั่ม 80ml (NEW)", family: "SME", accounts: ["7-ELEVEN"] },
+
+    { id: "cj_sme_baby_face_foam_2oz", label: "สมูทอี เบบี้ เฟส โฟม 2 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_foam_1_2oz", label: "สมูทอี เบบี้ เฟส โฟม 1.2 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_gel_3_3oz", label: "สมูทอี เบบี้ เฟส เจล 3.3 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_gel_1_2oz", label: "สมูทอี เบบี้ เฟส เจล 1.2 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_wine_baby_face_foam_1oz", label: "สมูทอี ไวน์ เบบี้ เฟส โฟม 1 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_wine_baby_face_foam_2oz", label: "สมูทอี ไวน์ เบบี้ เฟส โฟม 2 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_makeup_cleansing_water_100ml", label: "สมูทอี เมคอัพ คลีนซิ่ง วอเตอร์ 100 มล.", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_anti_melasma_white_foam_1oz", label: "สมูทอี แอนตี้-เมลาสมา&ไวท์ โฟม 1 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_40g", label: "สมูทอี ครีม 40 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_plus_white_10g", label: "สมูทอี ครีม พลัส ไวท์ 10 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_wine_serum_0_4oz", label: "สมูท อี ไวน์ เซรั่ม 0.4 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_plus_white_30g", label: "สมูทอี ครีม พลัส ไวท์ 30 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_15g", label: "สมูทอี ครีม 15 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_7g", label: "สมูทอี ครีม 7 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cica_7g", label: "สมูทอี ซิก้า 7 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_hydrogel_7g", label: "สมูทอี แอคเน่ ไฮโดรเจล 7 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_hydrogel_plus_10g", label: "สมูทอี แอคเน่ ไฮโดรเจล พลัส 10 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_clear_whitening_toner_150ml", label: "สมูทอี แอคเน่เคลียร์ไวท์เทนนิ่งโทนเนอร์ 150 มล.", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_gold_cream_30g", label: "สมูทอี โกลด์ ครีม 30 กรัม", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_gold_cream_12g", label: "สมูทอี โกลด์ ครีม 12 กรัม (0.4 ออนซ์)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_gold_foam_1_5oz", label: "สมูทอี โกลด์ โฟม 1.5 ออนซ์", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_gold_24k_hydro_boost_serum_30ml", label: "สมูทอี โกลด์24Kไฮโดรบูสแอนตี้เอจจิ้งสุพรีมเซรั่ม 30 มล.", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_scar_serum_5g_sachet", label: "สมูท อี แอคเน่ สการ์ เซรั่ม 5 กรัม (ซอง)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_hydrogel_plus_5g_sachet", label: "สมูท อี แอคเน่ ไฮโดรเจล พลัส 5 กรัม (ซอง)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_anti_wrinkle_sunscreen", label: "SME กันแดดลดเลือนริ้วรอย", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_brightening_gold_sunscreen", label: "SME กันแดดผิวใสโกลลดจุดดำ", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_hydration_foam_40ml_new", label: "สมูท อี เบบี้เฟส ไฮเดรชั่น โฟม 40 ML (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_hydration_foam_80ml_new", label: "สมูท อี เบบี้เฟซ ไฮเดรชั่น โฟม 80 ML (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_white_baby_face_spot_clear_foam_40ml_new", label: "สมูท อี ไวท์ เบบี้เฟส สปอตเคลียร์ โฟม 40 ML (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_white_baby_face_spot_clear_foam_80ml_new", label: "สมูท อี ไวท์ เบบี้เฟส สปอตเคลียร์ โฟม 80 ML (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_baby_face_acne_5_detoxify_foam_30ml_new", label: "สมูท อี เบบี้เฟส แอคเน่-5 ดีท็อกซิฟาย นอน-ไอโอนิก โฟม 30 ML (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_retinol_sachet_5g_new", label: "สมูท อี เรตินอล ซาเช่ 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_acne_serum_5g_new", label: "สมูท อี เซรั่ม แอคเน่ 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_gluta_b3_cellular_bright_5g_new", label: "สมูท อี กลูต้า บี3 เซลลูล่า ไบรท์ 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cream_5g_new", label: "สมูทอีครีม 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_intensive_hya_serum_5g_new", label: "สมูทอีอินเทนซีฟ ไฮยา เซรั่ม 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_sun_brightening_5g_new", label: "สมูทอีซันไบรท์เทนนิ่ง 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_white_baby_face_serum_5g_new", label: "สมูทอีไวท์เบบี้เฟส เซรั่ม 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+    { id: "cj_sme_cc_cream_spf50_5g_new", label: "สมูท อี ซีซีครีม SPF50PA++++ 5 กรัม (NEW)", family: "SME", accounts: ["CJ MORE"] },
+
+    { id: "cj_den_floss_50m", label: "เดนทิสเต้ ไหมขัดฟัน 50 ม.", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_tube_50g", label: "เดนติสเต้ ทูป 50 กรัม", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_premium_care_tube_100g", label: "เดนทิสเต้ พรีเมี่ยมแคร์ ทูป 100 กรัม", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_tube_100g", label: "เดนติสเต้ ทูป 100 กรัม", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_tube_160g", label: "เดนติสเต้ ทูป 160 กรัม", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_italy_brush_tube_5g_pack", label: "เดนติสเต้ แพ็ค (อิตาลี+หลอด ทูป 5 กรัม)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_twin_90g_tube_50g_pack", label: "เดนติสเต้ แพ็คคู่ (2*90 กรัม+หลอด ทูป 50 กรัม)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_italy_toothbrush_pack_3", label: "เดนติสเต้ อิตาลี แปรงสีฟัน แพ็ค 3 ชิ้น", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_mouth_spray", label: "สเปรย์ระงับกลิ่นปาก", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_advanced_care_toothbrush_new", label: "เดนทิสเต้ แปรงสีฟัน แอดวานซ์แคร์ (NEW)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_goodnight_pastel_toothbrush_new", label: "เดนทิสเต้ แปรงสีฟันกู๊ดไนท์พาสเทล (NEW)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_extra_strong_mint_50g_new", label: "เดนทิสเต้ ยาสีฟัน เอ็กซ์ตร้า สตรอง มินท์ (ขนาด 50 กรัม) (NEW)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_ultra_sensitive_45g_new", label: "เดนทิสเต้ ยาสีฟัน อัลตร้า เซนซิทีฟ (ขนาด 45 กรัม) (NEW)", family: "DEN", accounts: ["CJ MORE"] },
+    { id: "cj_den_premium_natural_white_50g_new", label: "เดนทิสเต้ ยาสีฟัน พรีเมี่ยม แอนด์ เนทเชอรัล ไวท์ (ขนาด 50 กรัม) (NEW)", family: "DEN", accounts: ["CJ MORE"] }
+  ];
+
+  const LINE_GROUPS = {
+    groupA: "https://line.me/R/nv/chat/",
+    groupB: "https://line.me/R/nv/chat/",
+    groupC: "https://line.me/R/nv/chat/",
+    groupD: "https://line.me/R/nv/chat/",
+    summary: "https://line.me/R/nv/chat/"
+  };
+
+  const SKU_ITEM_MAP = new Map(SKU_ITEMS.map((item) => [item.id, item]));
+  // The check form retains the master-list order. 7-ELEVEN uses this separate order only in copied reports.
+  const REPORT_COPY_LAYOUTS = {
+    "7-ELEVEN": [
+      {
+        heading: "📍สินค้าโฟม SMOOTHE",
+        ids: [
+          "sme_foam_baby_face_2oz",
+          "sme_foam_green_baby_face_1_2oz",
+          "sme_baby_face_gel_1_5oz",
+          "sme_white_foam_1oz",
+          "sme_green_foam_0_5oz",
+          "sme_cleansing_water_80ml",
+          "sme_white_baby_face_spot_clear_40ml",
+          "sme_acne_cleansing_serum_80ml_new",
+          "sme_baby_face_acne_5_detoxify_new",
+          "sme_green_foam_new"
+        ]
+      },
+      {
+        heading: "📍สินค้าครีม SMOOTHE",
+        ids: [
+          "sme_acne_gel_5g_sachet",
+          "sme_acne_scar_5g_sachet",
+          "sme_acne_sun_5g_sachet",
+          "sme_white_cream_5g_sachet",
+          "sme_gold_cream_5g_sachet",
+          "sme_gluta_b3_5g_sachet",
+          "sme_hya_filler_serum_5g_sachet",
+          "sme_radiant_glow_30ml_sachet",
+          "sme_sun_zero_feel_5g_new",
+          "sme_green_cream_10g",
+          "sme_plus_white",
+          "sme_acne_gel_7g",
+          "sme_new_skin_liquid_plaster"
+        ]
+      },
+      {
+        heading: "📍สินค้ายาสีฟัน DENTISTE",
+        ids: [
+          "den_tube_50g",
+          "den_tube_100g",
+          "den_extra_strong_mint_100g",
+          "den_premium_natural_white_50g",
+          "den_whitening_purple_sachet_10g_new",
+          "den_whitening_purple_100g_new",
+          "den_sensitive_100g",
+          "den_premium_care_50g",
+          "den_quality_max_45g",
+          "den_tube_set_90x90g",
+          "den_tube_set_160g_p3",
+          "den_valentine_100g"
+        ]
+      },
+      {
+        heading: "📍สินค้าแปรงสีฟัน DENTISTE",
+        ids: [
+          "den_italy_3_action_80",
+          "den_advanced_care_new",
+          "den_travel_set",
+          "den_goodnight_pastel",
+          "den_brush_pack_3",
+          "den_mouth_spray",
+          "den_floss",
+          "den_floss_pick_40",
+          "den_oral_care_set",
+          "den_sukiri_candy",
+          "den_proskin_6_capsules",
+          "den_proskin_12_capsules"
+        ]
+      }
+    ]
+  };
+  const DEFAULT_SKU_GLOBAL_FLAGS = {
+    sme_foam_green_baby_face_1_2oz: MONTHLY_FLAG_FOCUS,
+    sme_white_foam_1oz: MONTHLY_FLAG_FOCUS,
+    sme_green_cream_10g: MONTHLY_FLAG_FOCUS,
+    sme_new_skin_liquid_plaster: MONTHLY_FLAG_SKIP,
+    sme_acne_gel_7g: MONTHLY_FLAG_SKIP,
+    den_tube_50g: MONTHLY_FLAG_FOCUS,
+    den_italy_3_action_80: MONTHLY_FLAG_FOCUS,
+    den_oral_care_set: MONTHLY_FLAG_SKIP,
+    den_sukiri_candy: MONTHLY_FLAG_FOCUS,
+    den_tube_set_160g_p3: MONTHLY_FLAG_SKIP,
+    sme_acne_scar_5g_sachet: MONTHLY_FLAG_FOCUS,
+    den_valentine_100g: MONTHLY_FLAG_SKIP,
+    sme_acne_sun_5g_sachet: MONTHLY_FLAG_FOCUS,
+    sme_white_cream_5g_sachet: MONTHLY_FLAG_FOCUS,
+    sme_white_baby_face_spot_clear_40ml: MONTHLY_FLAG_FOCUS,
+    sme_gold_cream_5g_sachet: MONTHLY_FLAG_FOCUS,
+    sme_green_foam_new: MONTHLY_FLAG_SKIP,
+    den_premium_natural_white_50g: MONTHLY_FLAG_FOCUS,
+    den_extra_strong_mint_100g: MONTHLY_FLAG_FOCUS,
+    sme_gluta_b3_5g_sachet: MONTHLY_FLAG_FOCUS,
+    sme_hya_filler_serum_5g_sachet: MONTHLY_FLAG_FOCUS,
+    sme_radiant_glow_30ml_sachet: MONTHLY_FLAG_FOCUS,
+    sme_sun_zero_feel_5g_new: MONTHLY_FLAG_FOCUS,
+    den_whitening_purple_100g_new: MONTHLY_FLAG_FOCUS,
+    den_whitening_purple_sachet_10g_new: MONTHLY_FLAG_FOCUS,
+    sme_baby_face_acne_5_detoxify_new: MONTHLY_FLAG_FOCUS,
+    sme_acne_cleansing_serum_80ml_new: MONTHLY_FLAG_FOCUS
+  };
+
+  function getLineUrlByAccount(accountValue){
+    const a = (accountValue || "").trim().toUpperCase();
+    if (["CJ MORE", "LAWSON", "MINI BIG C", "VILLA MARKET"].includes(a)) return LINE_GROUPS.groupA;
+    if (["JIFFY", "TOPS DAILY"].includes(a)) return LINE_GROUPS.groupB;
+    if (["LOTUS'S GO FRESH"].includes(a)) return LINE_GROUPS.groupC;
+    if (["7-ELEVEN"].includes(a)) return LINE_GROUPS.groupD;
+    return LINE_GROUPS.groupA;
+  }
+
+  const $ = (id) => document.getElementById(id);
+
+  const reportDate = $("reportDate");
+  const account = $("account");
+  const branchCode = $("branchCode");
+  const branchName = $("branchName");
+  const locationArea = $("locationArea");
+  const issue = $("issue");
+  const note = $("note");
+
+  const customerGroup = $("customerGroup");
+  const statusBadge = $("statusBadge");
+  const statusText = $("statusText");
+  const smeCountBadge = $("smeCountBadge");
+  const denCountBadge = $("denCountBadge");
+  const smeCountMini = $("smeCountMini");
+  const denCountMini = $("denCountMini");
+
+  const preview = $("preview");
+  const btnCopy = $("btnCopy");
+  const btnCopyOnly = $("btnCopyOnly");
+  const btnSave = $("btnSave");
+  const btnSummary = $("btnSummary");
+  const btnResetForm = $("btnResetForm");
+
+  const skuBoard = $("skuBoard");
+  const skuListAll = $("skuListAll");
+  const summaryTopicList = $("summaryTopicList");
+
+  const histList = $("histList");
+  const histCount = $("histCount");
+  const histHint = $("histHint");
+  const btnHistorySummary = $("btnHistorySummary");
+  const btnSelectAll = $("btnSelectAll");
+  const btnToggleAll = $("btnToggleAll");
+  const btnClearAll = $("btnClearAll");
+
+  const toast = $("toast");
+
+  const modalBack = $("modalBack");
+  const modalTitle = $("modalTitle");
+  const modalText = $("modalText");
+  const modalClose = $("modalClose");
+  const modalYes = $("modalYes");
+  const modalNo = $("modalNo");
+
+  let history = [];
+  let selectedIds = new Set();
+  let showAllHistory = false;
+  let modalOnYes = null;
+  let embedPrefillContext = { placeId: "", reportToken: "", sheetName: "" };
+  let globalSkuFlags = {};
+  let reportDateMode = REPORT_DATE_MODE_AUTO;
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+
+  function todayISO(){
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function parseISODate(iso){
+    if (!iso) return null;
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (!Number.isFinite(d.getTime())) return null;
+    return d;
+  }
+
+  function normalizeReportDateMode(value){
+    return value === REPORT_DATE_MODE_MANUAL ? REPORT_DATE_MODE_MANUAL : REPORT_DATE_MODE_AUTO;
+  }
+
+  function getReportDateModeForValue(value){
+    const iso = String(value || "").trim();
+    return (iso && iso !== todayISO()) ? REPORT_DATE_MODE_MANUAL : REPORT_DATE_MODE_AUTO;
+  }
+
+  function resolveStoredReportDate(rawValue, rawMode){
+    const today = todayISO();
+    const value = String(rawValue || "").trim();
+    const parsed = parseISODate(value);
+    const mode = normalizeReportDateMode(rawMode);
+
+    if (mode === REPORT_DATE_MODE_MANUAL && parsed && value !== today){
+      return { value, mode };
+    }
+
+    return { value: today, mode: REPORT_DATE_MODE_AUTO };
+  }
+
+  function syncReportDateModeFromInput(){
+    reportDateMode = getReportDateModeForValue(reportDate.value);
+  }
+
+  function saveReportDateStateOnly(){
+    const base = loadJSON(STORE_FORM, {}) || {};
+    base.reportDate = reportDate.value || "";
+    base.reportDateMode = normalizeReportDateMode(reportDateMode);
+    saveJSON(STORE_FORM, base);
+  }
+
+  function formatReportDateBuddhist2(d){
+    const dd = pad2(d.getDate());
+    const mm = pad2(d.getMonth() + 1);
+    const be = d.getFullYear() + 543;
+    const yy = pad2(be % 100);
+    return `${dd}/${mm}/${yy}`;
+  }
+
+  function formatSummaryDateGregorian4(d){
+    const dd = pad2(d.getDate());
+    const mm = pad2(d.getMonth() + 1);
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  function formatDateTimeShort(ms){
+    const d = new Date(ms);
+    if (!Number.isFinite(d.getTime())) return "-";
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+
+  function safeText(v){
+    return String(v ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  }
+
+  function sameLocalDay(a, b){
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+  }
+
+  function isEntryCopiedToday(item){
+    if (!item || typeof item !== "object") return false;
+
+    const ts = Number(item.createdAt || 0);
+    if (Number.isFinite(ts) && ts > 0){
+      const d = new Date(ts);
+      if (Number.isFinite(d.getTime())) return sameLocalDay(d, new Date());
+    }
+
+    return String(item.reportDateISO || "").trim() === todayISO();
+  }
+
+  function normalizeMonthlyFlag(v){
+    if (v === MONTHLY_FLAG_FOCUS || v === MONTHLY_FLAG_SKIP) return v;
+    return MONTHLY_FLAG_NONE;
+  }
+
+  function defaultNotedState(){
+    return {
+      locationArea: "",
+      issue: DEFAULT_ISSUE_TEMPLATE,
+      note: DEFAULT_NOTE_TEMPLATE,
+      skuChecks: {},
+      summarySelections: {}
+    };
+  }
+
+  function issueValueOrDefault(value){
+    const text = String(value ?? "");
+    return text.trim() ? text : DEFAULT_ISSUE_TEMPLATE;
+  }
+
+  function noteValueOrDefault(value){
+    const text = String(value ?? "");
+    return text.trim() ? text : DEFAULT_NOTE_TEMPLATE;
+  }
+
+  function normalizeSkuChecks(raw){
+    const out = {};
+    if (!raw || typeof raw !== "object") return out;
+
+    if (Array.isArray(raw)){
+      for (const id of raw){
+        if (typeof id !== "string") continue;
+        if (!SKU_ITEM_MAP.has(id)) continue;
+        out[id] = true;
+      }
+      return out;
+    }
+
+    for (const [id, value] of Object.entries(raw)){
+      if (!SKU_ITEM_MAP.has(id)) continue;
+      out[id] = !!value;
+    }
+
+    return out;
+  }
+
+  function normalizeSummarySelections(raw){
+    const out = {};
+    if (!raw || typeof raw !== "object") return out;
+
+    if (Array.isArray(raw)){
+      for (const id of raw){
+        if (typeof id !== "string") continue;
+        if (!SUMMARY_TOPICS.some((topic) => topic.id === id)) continue;
+        out[id] = true;
+      }
+      return out;
+    }
+
+    for (const topic of SUMMARY_TOPICS){
+      out[topic.id] = !!raw[topic.id];
+    }
+
+    return out;
+  }
+
+  function normalizeNotedState(raw){
+    const out = defaultNotedState();
+    if (!raw || typeof raw !== "object") return out;
+
+    const source = (raw.noted && typeof raw.noted === "object") ? raw.noted : raw;
+
+    if (source.locationArea !== undefined && source.locationArea !== null){
+      out.locationArea = String(source.locationArea);
+    }
+    if (source.issue !== undefined && source.issue !== null){
+      out.issue = issueValueOrDefault(source.issue);
+    }
+    if (source.note !== undefined && source.note !== null){
+      out.note = noteValueOrDefault(source.note);
+    }
+    out.skuChecks = normalizeSkuChecks(source.skuChecks || source.checkedSkus || {});
+    out.summarySelections = normalizeSummarySelections(
+      source.summarySelections || source.summaryChecks || source.summaryTopics || {}
+    );
+
+    return out;
+  }
+
+  function normalizeHistoryEntry(item){
+    if (!item || typeof item !== "object") return null;
+
+    const createdAtRaw = Number(item.createdAt || 0);
+    const createdAt = Number.isFinite(createdAtRaw) && createdAtRaw > 0 ? createdAtRaw : Date.now();
+    const reportText = safeText(item.reportText).trim();
+    if (!reportText) return null;
+
+    return {
+      id: item.id ? String(item.id) : makeId(),
+      createdAt,
+      placeId: String(item.placeId || "").trim(),
+      sheetName: String(item.sheetName || "").trim(),
+      reportDateISO: String(item.reportDateISO || "").trim(),
+      reportText,
+      account: safeText(item.account).trim(),
+      branchCode: safeText(item.branchCode).trim(),
+      branchName: safeText(item.branchName).trim(),
+      summarySelections: normalizeSummarySelections(
+        item.summarySelections || item.summaryChecks || item.summaryTopics || {}
+      )
+    };
+  }
+
+  function sameSummarySelections(a, b){
+    const left = normalizeSummarySelections(a);
+    const right = normalizeSummarySelections(b);
+
+    return SUMMARY_TOPICS.every((topic) => !!left[topic.id] === !!right[topic.id]);
+  }
+
+  function isDuplicateHistoryEntry(a, b){
+    if (!a || !b) return false;
+    if (String(a.reportText || "") !== String(b.reportText || "")) return false;
+    if (String(a.account || "") !== String(b.account || "")) return false;
+    if (String(a.branchCode || "") !== String(b.branchCode || "")) return false;
+    if (String(a.branchName || "") !== String(b.branchName || "")) return false;
+    if (!sameSummarySelections(a.summarySelections, b.summarySelections)) return false;
+
+    const ta = Number(a.createdAt || 0);
+    const tb = Number(b.createdAt || 0);
+    if (ta > 0 && tb > 0 && Math.abs(ta - tb) > HISTORY_DUPLICATE_WINDOW_MS) return false;
+
+    return true;
+  }
+
+  function compactHistoryList(list){
+    const src = Array.isArray(list) ? list : [];
+    const out = [];
+
+    for (const raw of src){
+      const item = normalizeHistoryEntry(raw);
+      if (!item) continue;
+
+      const hasDup = out.slice(0, 12).some((it) => isDuplicateHistoryEntry(item, it));
+      if (hasDup) continue;
+
+      out.push(item);
+      if (out.length >= MAX_HISTORY_ITEMS) break;
+    }
+
+    return out;
+  }
+
+  function readStoredHistory(){
+    return compactHistoryList(loadJSON(STORE_HISTORY, []));
+  }
+
+  function mergeHistoryLists(...lists){
+    const all = [];
+    for (const list of lists){
+      if (!Array.isArray(list)) continue;
+      for (const raw of list){
+        const item = normalizeHistoryEntry(raw);
+        if (!item) continue;
+        all.push(item);
+      }
+    }
+
+    all.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+    const out = [];
+    for (const item of all){
+      const hasDup = out.some((it) => isDuplicateHistoryEntry(item, it));
+      if (hasDup) continue;
+      out.push(item);
+      if (out.length >= MAX_HISTORY_ITEMS) break;
+    }
+
+    return out;
+  }
+
+  function getVisibleHistoryItems(){
+    return showAllHistory ? history.slice() : history.filter(isEntryCopiedToday);
+  }
+
+  function pruneSelectedIds(){
+    const valid = new Set(history.map((item) => item.id));
+    let changed = false;
+
+    for (const id of Array.from(selectedIds)){
+      if (valid.has(id)) continue;
+      selectedIds.delete(id);
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => toast.classList.remove("show"), 1800);
+  }
+
+  function setStatus(type, text){
+    if (type === "ok"){
+      statusBadge.className = "badge ok";
+      statusBadge.textContent = "✅ สำเร็จ";
+    } else if (type === "err"){
+      statusBadge.className = "badge err";
+      statusBadge.textContent = "❌ ผิดพลาด";
+    } else {
+      statusBadge.className = "badge wait";
+      statusBadge.textContent = "⏳ พร้อม";
+    }
+    statusText.textContent = text || "";
+  }
+
+  function openUrl(url){
+    try{
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e){}
+  }
+
+  function postToParent(type, payload){
+    if (!EMBED) return;
+    try{
+      if (!window.parent || window.parent === window) return;
+      const targetOrigin = (location.origin && location.origin !== "null") ? location.origin : "*";
+      window.parent.postMessage({ type, payload }, targetOrigin);
+    } catch (e){}
+  }
+
+  function renderLocationOptions(){
+    const options = ['<option value="">— เลือกบริเวณ —</option>']
+      .concat(LOCATION_OPTIONS.map((value) => `<option value="${escapeHtmlAttr(value)}">${escapeHtml(value)}</option>`));
+    locationArea.innerHTML = options.join("");
+  }
+
+  function localCopyDayKey(timestamp){
+    const date = new Date(Number(timestamp || 0) || Date.now());
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function normalizedStorePart(value){
+    return safeText(value).trim().toLocaleLowerCase("th").replace(/\s+/g, " ");
+  }
+
+  function sameHistoryStore(a, b){
+    const placeA = String(a.placeId || "").trim();
+    const placeB = String(b.placeId || "").trim();
+    const sheetA = normalizedStorePart(a.sheetName);
+    const sheetB = normalizedStorePart(b.sheetName);
+    if (placeA && placeB && sheetA && sheetB) return placeA === placeB && sheetA === sheetB;
+    const codeA = normalizedStorePart(a.branchCode);
+    const codeB = normalizedStorePart(b.branchCode);
+    const nameA = normalizedStorePart(a.branchName);
+    const nameB = normalizedStorePart(b.branchName);
+    if ((!codeA && !nameA) || (!codeB && !nameB)) return false;
+    return normalizedStorePart(a.account) === normalizedStorePart(b.account)
+      && codeA === codeB
+      && nameA === nameB;
+  }
+
+  function isSameDayStoreEntry(a, b){
+    return !!a && !!b && localCopyDayKey(a.createdAt) === localCopyDayKey(b.createdAt) && sameHistoryStore(a, b);
+  }
+
+  function upsertHistoryEntry(entry, ...lists){
+    const normalized = normalizeHistoryEntry(entry);
+    if (!normalized) return null;
+    const all = mergeHistoryLists(...lists);
+    const previous = all.find((item) => isSameDayStoreEntry(item, normalized));
+    if (previous){
+      normalized.id = previous.id;
+      if (selectedIds.has(previous.id)) selectedIds.add(normalized.id);
+    }
+    history = [normalized, ...all.filter((item) => item.id !== normalized.id && !isSameDayStoreEntry(item, normalized))]
+      .slice(0, MAX_HISTORY_ITEMS);
+    return normalized;
+  }
+
+  function renderSummaryTopics(){
+    summaryTopicList.innerHTML = "";
+
+    for (const topic of SUMMARY_TOPICS){
+      const row = document.createElement("label");
+      row.className = "summaryTopicItem";
+      row.innerHTML = `
+        <input type="checkbox" data-summary-id="${escapeHtmlAttr(topic.id)}" aria-label="${escapeHtmlAttr(topic.label)}">
+        <span class="summaryTopicLabel">${escapeHtml(topic.label)}</span>
+      `;
+      summaryTopicList.appendChild(row);
+    }
+  }
+
+  function createSkuRow(item){
+    const row = document.createElement("div");
+    row.className = "skuRow";
+    row.dataset.skuId = item.id;
+    row.dataset.family = item.family;
+    row.innerHTML = `
+      <select class="skuFlag" data-role="flag" aria-label="สถานะกลางของ ${escapeHtmlAttr(item.label)}">
+        <option value="">ว่าง</option>
+        <option value="focus">⭐</option>
+        <option value="skip">❌</option>
+      </select>
+      <div class="skuTitle">${escapeHtml(item.label)}</div>
+      <label class="skuCheckWrap">
+        <input type="checkbox" class="skuCheck" data-role="check" aria-label="มีสินค้า ${escapeHtmlAttr(item.label)}">
+      </label>
+    `;
+    return row;
+  }
+
+  function renderSkuLists(){
+    skuListAll.innerHTML = "";
+
+    for (const item of SKU_ITEMS){
+      skuListAll.appendChild(createSkuRow(item));
+    }
+  }
+
+  function isSkuAvailableForAccount(item, accountValue = account.value){
+    const normalizedAccount = safeText(accountValue).trim().toUpperCase();
+    if (normalizedAccount === "CJ MORE"){
+      return Array.isArray(item.accounts) && item.accounts.some((allowed) => safeText(allowed).trim().toUpperCase() === normalizedAccount);
+    }
+    if (!Array.isArray(item.accounts) || item.accounts.length === 0) return true;
+    return item.accounts.some((allowed) => safeText(allowed).trim().toUpperCase() === normalizedAccount);
+  }
+
+  function getActiveSkuItems(){
+    return SKU_ITEMS.filter((item) => isSkuAvailableForAccount(item));
+  }
+
+  function updateSkuVisibility(){
+    for (const item of SKU_ITEMS){
+      const row = getSkuRow(item.id);
+      if (row) row.hidden = !isSkuAvailableForAccount(item);
+    }
+  }
+
+  function getSkuRows(){
+    return Array.from(skuBoard.querySelectorAll(".skuRow"));
+  }
+
+  function getSkuRow(id){
+    return skuBoard.querySelector(`.skuRow[data-sku-id="${cssEscape(id)}"]`);
+  }
+
+  function getRowFlag(row){
+    return row ? normalizeMonthlyFlag(row.querySelector('[data-role="flag"]').value) : MONTHLY_FLAG_NONE;
+  }
+
+  function syncSkuRowState(row, keepChecked){
+    if (!row) return;
+    const checkbox = row.querySelector('[data-role="check"]');
+    const isSkip = getRowFlag(row) === MONTHLY_FLAG_SKIP;
+
+    checkbox.disabled = isSkip;
+    if (isSkip && !keepChecked){
+      checkbox.checked = false;
+    }
+
+    row.classList.toggle("sku-disabled", isSkip);
+  }
+
+  function applyGlobalFlagsToDom(){
+    for (const row of getSkuRows()){
+      const id = row.dataset.skuId || "";
+      const select = row.querySelector('[data-role="flag"]');
+      select.value = normalizeMonthlyFlag(globalSkuFlags[id]);
+      syncSkuRowState(row, false);
+    }
+  }
+
+  function loadGlobalSkuFlags(){
+    const raw = loadJSON(STORE_SKU_GLOBAL, null);
+    const storedFlags = (raw && typeof raw === "object" && raw.flags && typeof raw.flags === "object")
+      ? raw.flags
+      : raw;
+    const storedVersion = (raw && typeof raw === "object" && typeof raw.version === "string")
+      ? raw.version
+      : "";
+    const usePresetDefaults = storedVersion !== SKU_GLOBAL_PRESET_VERSION;
+    // Merge newly shipped defaults without overwriting flags users already configured.
+    const source = Object.assign({}, DEFAULT_SKU_GLOBAL_FLAGS, usePresetDefaults ? {} : storedFlags);
+    const out = {};
+
+    if (source && typeof source === "object"){
+      for (const [id, value] of Object.entries(source)){
+        if (!SKU_ITEM_MAP.has(id)) continue;
+        const normalized = normalizeMonthlyFlag(value);
+        if (!normalized) continue;
+        out[id] = normalized;
+      }
+    }
+
+    globalSkuFlags = out;
+    if (usePresetDefaults){
+      saveGlobalSkuFlags();
+    }
+  }
+
+  function saveGlobalSkuFlags(){
+    const out = {};
+    for (const [id, value] of Object.entries(globalSkuFlags)){
+      const normalized = normalizeMonthlyFlag(value);
+      if (!normalized) continue;
+      out[id] = normalized;
+    }
+    globalSkuFlags = out;
+    saveJSON(STORE_SKU_GLOBAL, {
+      version: SKU_GLOBAL_PRESET_VERSION,
+      flags: out
+    });
+  }
+
+  function clearAllSkuChecks(){
+    for (const row of getSkuRows()){
+      const checkbox = row.querySelector('[data-role="check"]');
+      checkbox.checked = false;
+    }
+  }
+
+  function applySkuChecksToDom(checks){
+    clearAllSkuChecks();
+    const normalized = normalizeSkuChecks(checks);
+
+    for (const [id, value] of Object.entries(normalized)){
+      const row = getSkuRow(id);
+      if (!row) continue;
+      syncSkuRowState(row, false);
+      const checkbox = row.querySelector('[data-role="check"]');
+      if (!checkbox.disabled){
+        checkbox.checked = !!value;
+      }
+    }
+  }
+
+  function collectSkuChecksFromDom(){
+    const out = {};
+
+    for (const row of getSkuRows()){
+      if (row.hidden) continue;
+      const checkbox = row.querySelector('[data-role="check"]');
+      if (!checkbox || checkbox.disabled || !checkbox.checked) continue;
+      out[row.dataset.skuId] = true;
+    }
+
+    return out;
+  }
+
+  function countCheckedByFamily(family){
+    let count = 0;
+    for (const row of getSkuRows()){
+      if (row.hidden) continue;
+      if (row.dataset.family !== family) continue;
+      const checkbox = row.querySelector('[data-role="check"]');
+      if (checkbox && !checkbox.disabled && checkbox.checked) count++;
+    }
+    return count;
+  }
+
+  function updateCounts(){
+    const smeCount = countCheckedByFamily("SME");
+    const denCount = countCheckedByFamily("DEN");
+
+    smeCountBadge.textContent = `สินค้า SME : มีสินค้า ${smeCount} รายการ`;
+    denCountBadge.textContent = `สินค้า DEN : มีสินค้า ${denCount} รายการ`;
+    smeCountMini.textContent = `SME ${smeCount} รายการ`;
+    denCountMini.textContent = `DEN ${denCount} รายการ`;
+  }
+
+  function buildSkuLine(item){
+    const row = getSkuRow(item.id);
+    if (!row) return `${item.label} : `;
+
+    const checkbox = row.querySelector('[data-role="check"]');
+    const flag = getRowFlag(row);
+    const prefix = flag === MONTHLY_FLAG_FOCUS ? "⭐" : "";
+    let value = "";
+
+    if (flag === MONTHLY_FLAG_SKIP){
+      value = "❌";
+    } else if (checkbox && checkbox.checked){
+      value = "✅";
+    }
+
+    return `${prefix}${item.label} : ${value}`;
+  }
+
+  function getReportCopySections(){
+    const accountKey = safeText(account.value).trim().toUpperCase();
+    const layout = REPORT_COPY_LAYOUTS[accountKey];
+    if (!layout) return null;
+
+    const activeItems = getActiveSkuItems();
+    const activeById = new Map(activeItems.map((item) => [item.id, item]));
+    const usedIds = new Set();
+    const sections = [];
+
+    for (const section of layout){
+      const items = section.ids
+        .map((id) => activeById.get(id))
+        .filter(Boolean);
+      for (const item of items) usedIds.add(item.id);
+      if (items.length) sections.push({ heading: section.heading, items });
+    }
+
+    // Keep a future SKU visible in copied reports until it is placed in the account layout.
+    const remaining = activeItems.filter((item) => !usedIds.has(item.id));
+    if (remaining.length) sections.push({ heading: "📍สินค้าอื่นๆ", items: remaining });
+    return sections;
+  }
+
+  function collectSummarySelectionsFromDom(){
+    const out = {};
+
+    for (const topic of SUMMARY_TOPICS){
+      const input = summaryTopicList.querySelector(`[data-summary-id="${cssEscape(topic.id)}"]`);
+      if (input instanceof HTMLInputElement && input.checked){
+        out[topic.id] = true;
+      }
+    }
+
+    return out;
+  }
+
+  function applySummarySelectionsToDom(raw){
+    const normalized = normalizeSummarySelections(raw);
+
+    for (const topic of SUMMARY_TOPICS){
+      const input = summaryTopicList.querySelector(`[data-summary-id="${cssEscape(topic.id)}"]`);
+      if (!(input instanceof HTMLInputElement)) continue;
+      input.checked = !!normalized[topic.id];
+    }
+  }
+
+  function buildNotedPayloadForParent(){
+    return {
+      v: 3,
+      locationArea: String(locationArea.value || "").trim(),
+      issue: safeText(issueValueOrDefault(issue.value)).trimEnd(),
+      note: safeText(note.value).trimEnd(),
+      skuChecks: collectSkuChecksFromDom(),
+      summarySelections: collectSummarySelectionsFromDom()
+    };
+  }
+
+  function notifyParentReportCopied(){
+    if (!EMBED) return;
+    postToParent("PT_REPORT_COPIED", {
+      placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
+      reportToken: String((embedPrefillContext && embedPrefillContext.reportToken) || "").trim(),
+      sheetName: String((embedPrefillContext && embedPrefillContext.sheetName) || "").trim(),
+      copiedAt: Date.now(),
+      reportDateISO: reportDate.value || todayISO(),
+      reportText: preview.textContent || buildReportText(),
+      account: safeText(account.value).trim(),
+      branchCode: safeText(branchCode.value).trim(),
+      branchName: safeText(branchName.value).trim(),
+      noted: buildNotedPayloadForParent()
+    });
+  }
+
+  function buildReportText(){
+    const d = parseISODate(reportDate.value) || new Date();
+    const locationText = safeText(locationArea.value).trim();
+    const issueText = safeText(issueValueOrDefault(issue.value)).trimEnd();
+    const noteText = safeText(note.value).trimEnd();
+
+    const lines = [
+      `วันที่ ${formatReportDateBuddhist2(d)}`,
+      TEAM_REPORT,
+      `แอคเคาท์ : ${safeText(account.value).trim()}`,
+      `รหัสสาขา : ${safeText(branchCode.value).trim()}`,
+      `ชื่อสาขา : ${safeText(branchName.value).trim()}`,
+      `สาขาตั้งอยู่บริเวณ : ${locationText}`,
+      `กลุ่มลูกค้า : ${FIXED_CUSTOMER_GROUP}`,
+      "",
+      `สินค้า SME : มีสินค้า ${countCheckedByFamily("SME")} รายการ`,
+      `สินค้า DEN : มีสินค้า ${countCheckedByFamily("DEN")} รายการ`,
+      ""
+    ];
+
+    const copySections = getReportCopySections();
+    if (copySections){
+      for (const section of copySections){
+        lines.push(section.heading);
+        for (const item of section.items) lines.push(buildSkuLine(item));
+        lines.push("");
+      }
+    } else {
+      for (const item of getActiveSkuItems()) lines.push(buildSkuLine(item));
+    }
+
+    lines.push("");
+    lines.push("⛔ปัญหาที่พบ");
+    lines.push(issueText);
+    lines.push("");
+    lines.push("หมายเหตุ :");
+    lines.push(noteText);
+
+    return lines.join("\n");
+  }
+
+  function updatePreview(){
+    updateSkuVisibility();
+    updateCounts();
+    preview.textContent = buildReportText();
+  }
+
+  async function copyToClipboard(text){
+    const t = String(text ?? "");
+    try{
+      if (navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(t);
+        return true;
+      }
+    } catch (e){}
+
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e){
+      return false;
+    }
+  }
+
+  function loadJSON(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function isQuotaExceededError(err){
+    if (!err) return false;
+    const name = String(err.name || "");
+    const message = String(err.message || "");
+    const code = Number(err.code || 0);
+    return code === 22
+      || code === 1014
+      || name === "QuotaExceededError"
+      || name === "NS_ERROR_DOM_QUOTA_REACHED"
+      || message.toLowerCase().includes("quota");
+  }
+
+  function clearGbkkCaches(){
+    let removed = 0;
+    try{
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++){
+        const key = localStorage.key(i);
+        if (key && key.indexOf(STORAGE_CACHE_PREFIX) === 0){
+          keys.push(key);
+        }
+      }
+
+      for (const key of keys){
+        localStorage.removeItem(key);
+        removed++;
+      }
+    } catch (err){}
+    return removed;
+  }
+
+  function saveJSON(key, value){
+    try{
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (err){
+      if (isQuotaExceededError(err) && clearGbkkCaches() > 0){
+        try{
+          localStorage.setItem(key, JSON.stringify(value));
+          return true;
+        } catch (retryErr){
+          err = retryErr;
+        }
+      }
+      console.warn(`saveJSON failed for ${key}`, err);
+      return false;
+    }
+  }
+
+  function saveFormState(){
+    const base = loadJSON(STORE_FORM, {}) || {};
+    const data = {
+      ...base,
+      reportDate: reportDate.value || "",
+      reportDateMode: normalizeReportDateMode(reportDateMode)
+    };
+
+    if (!EMBED){
+      data.account = account.value || "";
+      data.branchCode = branchCode.value || "";
+      data.branchName = branchName.value || "";
+      data.locationArea = locationArea.value || "";
+      data.issue = issueValueOrDefault(issue.value);
+      data.note = noteValueOrDefault(note.value);
+      data.skuChecks = collectSkuChecksFromDom();
+      data.summarySelections = collectSummarySelectionsFromDom();
+    } else {
+      delete data.account;
+      delete data.branchCode;
+      delete data.branchName;
+      delete data.locationArea;
+      delete data.issue;
+      delete data.note;
+      delete data.skuChecks;
+      delete data.summarySelections;
+    }
+
+    saveJSON(STORE_FORM, data);
+  }
+
+  function loadFormState(){
+    const currentData = loadJSON(STORE_FORM, null);
+    // Preserve any standalone draft that was saved before the storage split.
+    const data = currentData || (!EMBED ? loadJSON(LEGACY_STORE_FORM, null) : null);
+    if (!data){
+      reportDate.value = "";
+      reportDateMode = REPORT_DATE_MODE_AUTO;
+      return false;
+    }
+
+    if (!EMBED && !currentData){
+      saveJSON(STORE_FORM, data);
+    }
+
+    if (!EMBED){
+      account.value = data.account || "";
+      branchCode.value = data.branchCode || "";
+      branchName.value = data.branchName || "";
+      locationArea.value = data.locationArea || "";
+      issue.value = issueValueOrDefault(data.issue);
+      note.value = noteValueOrDefault(data.note);
+      applySkuChecksToDom(data.skuChecks || {});
+      applySummarySelectionsToDom(data.summarySelections || {});
+    } else {
+      account.value = "";
+      branchCode.value = "";
+      branchName.value = "";
+      locationArea.value = "";
+      issue.value = DEFAULT_ISSUE_TEMPLATE;
+      note.value = DEFAULT_NOTE_TEMPLATE;
+      applySkuChecksToDom({});
+      applySummarySelectionsToDom({});
+    }
+
+    const resolvedDate = resolveStoredReportDate(data.reportDate, data.reportDateMode);
+    reportDate.value = resolvedDate.value;
+    reportDateMode = resolvedDate.mode;
+    return resolvedDate.value !== String(data.reportDate || "").trim()
+      || reportDateMode !== normalizeReportDateMode(data.reportDateMode);
+  }
+
+  function loadUIState(){
+    const ui = loadJSON(STORE_UI, {});
+    showAllHistory = !!ui.showAllHistory;
+    selectedIds = new Set(Array.isArray(ui.selectedIds) ? ui.selectedIds : []);
+  }
+
+  function saveUIState(){
+    saveJSON(STORE_UI, {
+      showAllHistory,
+      selectedIds: Array.from(selectedIds)
+    });
+  }
+
+  function loadHistory(){
+    history = mergeHistoryLists(readStoredHistory(), history);
+  }
+
+  function saveHistory(showError = false){
+    history = compactHistoryList(history);
+    const ok = saveJSON(STORE_HISTORY, history);
+    if (!ok && showError){
+      setStatus("err", "คัดลอกแล้ว แต่บันทึกประวัติลงเครื่องไม่สำเร็จ");
+      showToast("คัดลอกแล้ว แต่บันทึกประวัติลงเครื่องไม่สำเร็จ");
+    }
+    return ok;
+  }
+
+  function makeId(){
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function addHistoryEntry(reportText){
+    const entry = normalizeHistoryEntry({
+      id: makeId(),
+      createdAt: Date.now(),
+      placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
+      sheetName: String((embedPrefillContext && embedPrefillContext.sheetName) || "").trim(),
+      reportDateISO: reportDate.value || todayISO(),
+      reportText,
+      account: safeText(account.value).trim(),
+      branchCode: safeText(branchCode.value).trim(),
+      branchName: safeText(branchName.value).trim(),
+      summarySelections: collectSummarySelectionsFromDom()
+    });
+    if (!entry) return null;
+
+    const savedEntry = upsertHistoryEntry(entry, history, readStoredHistory());
+    saveHistory(true);
+    if (!EMBED) renderHistory();
+    return savedEntry;
+  }
+
+  function deleteHistoryEntry(id){
+    history = history.filter((item) => item.id !== id);
+    selectedIds.delete(id);
+    saveHistory();
+    saveUIState();
+    renderHistory();
+  }
+
+  function clearAllHistory(){
+    history = [];
+    selectedIds.clear();
+    saveHistory();
+    saveUIState();
+    renderHistory();
+  }
+
+  function renderHistory(){
+    if (EMBED) return;
+
+    const total = history.length;
+    const todayCount = history.filter(isEntryCopiedToday).length;
+    const list = getVisibleHistoryItems();
+    const visibleIds = list.map((item) => item.id);
+    const visibleSelectedCount = visibleIds.filter((id) => selectedIds.has(id)).length;
+    const selectedCount = Array.from(selectedIds).filter((id) => history.some((item) => item.id === id)).length;
+
+    histCount.textContent = showAllHistory
+      ? `ทั้งหมด ${total} รายการ`
+      : `วันนี้ ${todayCount} รายการ`;
+
+    histHint.textContent = selectedCount > 0
+      ? `เลือกไว้ ${selectedCount} รายการ (ใช้สรุปยอดได้เลย)`
+      : (showAllHistory
+        ? `กำลังดูประวัติทั้งหมด ${total} รายการ`
+        : `ติ๊กช่องหน้ารายการที่ COPY วันนี้ เพื่อใช้ “สรุปยอดรายวัน”`);
+
+    btnToggleAll.textContent = showAllHistory ? "กลับมาเฉพาะวันนี้" : "ดูทั้งหมด";
+    btnSelectAll.textContent = (list.length > 0 && visibleSelectedCount === list.length) ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด";
+    btnSelectAll.disabled = list.length === 0;
+
+    histList.innerHTML = "";
+    if (list.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = total > 0
+        ? "วันนี้ยังไม่มีรายการที่ COPY — กด “ดูทั้งหมด” เพื่อเปิดประวัติเก่า"
+        : "ยังไม่มีประวัติ — กด COPY เพื่อบันทึกเข้าไป";
+      histList.appendChild(empty);
+      return;
+    }
+
+    for (const item of list){
+      const wrap = document.createElement("div");
+      wrap.className = "histItem";
+
+      const row = document.createElement("div");
+      row.className = "histRow";
+
+      const left = document.createElement("div");
+      left.className = "histLeft";
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "check";
+      cb.checked = selectedIds.has(item.id);
+      cb.addEventListener("change", () => {
+        if (cb.checked) selectedIds.add(item.id);
+        else selectedIds.delete(item.id);
+        saveUIState();
+        renderHistory();
+      });
+
+      const main = document.createElement("div");
+      main.className = "histMain";
+
+      const title = document.createElement("div");
+      title.className = "histTitle";
+      const tAcc = item.account || "(ไม่ระบุแอคเคาท์)";
+      const tBc = item.branchCode || "(ไม่ระบุรหัสสาขา)";
+      const tBn = item.branchName || "(ไม่ระบุชื่อสาขา)";
+      title.textContent = `${tAcc} ${tBc} ${tBn}`.trim();
+
+      const meta = document.createElement("div");
+      meta.className = "histMeta";
+      meta.textContent = `บันทึก: ${formatDateTimeShort(item.createdAt)} • วันที่รายงาน: ${item.reportDateISO || "-"}`;
+
+      main.appendChild(title);
+      main.appendChild(meta);
+
+      left.appendChild(cb);
+      left.appendChild(main);
+
+      const actions = document.createElement("div");
+      actions.className = "histActions";
+
+      const btnCopyAgain = document.createElement("button");
+      btnCopyAgain.className = "btn soft";
+      btnCopyAgain.textContent = "📋 COPY";
+      btnCopyAgain.addEventListener("click", async () => {
+        const ok = await copyToClipboard(item.reportText || "");
+        if (ok){
+          setStatus("ok", "คัดลอกจากประวัติแล้ว");
+          showToast("คัดลอกแล้ว ✅");
+        } else {
+          setStatus("err", "คัดลอกไม่สำเร็จ (ลองอีกครั้ง)");
+          showToast("คัดลอกไม่สำเร็จ ❌");
+        }
+
+        const url = getLineUrlByAccount(item.account);
+        openUrl(url);
+        showToast("เปิด LINE กลุ่มแล้ว");
+      });
+
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn danger";
+      btnDel.textContent = "🗑 ลบ";
+      btnDel.addEventListener("click", () => {
+        openConfirm(
+          "ยืนยันลบรายการ",
+          `ต้องการลบรายการนี้ใช่ไหม?\n\n${(item.account || "")} ${(item.branchCode || "")} ${(item.branchName || "")}`.trim(),
+          () => deleteHistoryEntry(item.id)
+        );
+      });
+
+      actions.appendChild(btnCopyAgain);
+      actions.appendChild(btnDel);
+
+      row.appendChild(left);
+      row.appendChild(actions);
+      wrap.appendChild(row);
+      histList.appendChild(wrap);
+    }
+  }
+
+  function openConfirm(title, text, onYes){
+    modalTitle.textContent = title || "ยืนยัน";
+    modalText.textContent = text || "-";
+    modalOnYes = typeof onYes === "function" ? onYes : null;
+    modalBack.style.display = "flex";
+    modalBack.setAttribute("aria-hidden", "false");
+  }
+
+  function closeConfirm(){
+    modalBack.style.display = "none";
+    modalBack.setAttribute("aria-hidden", "true");
+    modalOnYes = null;
+  }
+
+  modalClose.addEventListener("click", closeConfirm);
+  modalNo.addEventListener("click", closeConfirm);
+  modalYes.addEventListener("click", () => {
+    try{ if (modalOnYes) modalOnYes(); } finally { closeConfirm(); }
+  });
+  modalBack.addEventListener("click", (e) => {
+    if (e.target === modalBack) closeConfirm();
+  });
+
+  function validateForCopy(){
+    const missing = [];
+    if (!account.value) missing.push("แอคเคาท์");
+    if (!branchCode.value.trim()) missing.push("รหัสสาขา");
+    if (!branchName.value.trim()) missing.push("ชื่อสาขา");
+    return missing;
+  }
+
+  async function doCopy({ openLine = true } = {}){
+    updatePreview();
+    const text = preview.textContent || buildReportText();
+
+    const miss = validateForCopy();
+    if (miss.length){
+      setStatus("wait", `เตือน: ยังไม่ได้กรอก ${miss.join(", ")} (แต่คัดลอกให้แล้ว)`);
+    }
+
+    const ok = await copyToClipboard(text);
+    if (!ok){
+      setStatus("err", "คัดลอกไม่สำเร็จ (ลองอีกครั้ง)");
+      showToast("คัดลอกไม่สำเร็จ ❌");
+      return;
+    }
+
+    setStatus("ok", "คัดลอกสคริปแล้ว");
+    showToast("คัดลอกแล้ว ✅");
+    addHistoryEntry(text);
+    saveFormState();
+    notifyParentReportCopied();
+
+    if (openLine){
+      const url = getLineUrlByAccount(account.value);
+      openUrl(url);
+      showToast("เปิด LINE กลุ่มแล้ว");
+    }
+  }
+
+  function doSave(){
+    updatePreview();
+    const text = preview.textContent || buildReportText();
+    const miss = validateForCopy();
+
+    addHistoryEntry(text);
+    saveFormState();
+    setStatus(miss.length ? "wait" : "ok", miss.length
+      ? `บันทึกในเครื่องแล้ว (ยังไม่ได้กรอก ${miss.join(", ")})`
+      : "บันทึกสคริปต์ไว้ในเครื่องแล้ว");
+    showToast("บันทึกในเครื่องแล้ว ✅");
+  }
+
+  function buildSummaryText(){
+    const d = parseISODate(reportDate.value) || new Date();
+    const dateLine = formatSummaryDateGregorian4(d);
+    const selectedItems = history.filter((item) => selectedIds.has(item.id));
+    selectedItems.sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+
+    const lines = [];
+    lines.push(`สรุปงาน วันที่ ${dateLine}`);
+    lines.push(TEAM_SUMMARY);
+    lines.push("");
+
+    selectedItems.forEach((item, idx) => {
+      const a = (item.account || "").trim();
+      const bc = (item.branchCode || "").trim();
+      const bn = (item.branchName || "").trim();
+      lines.push(`${idx + 1}. ${[a, bc, bn].filter(Boolean).join(" ").trim()}`);
+    });
+
+    lines.push("");
+    lines.push(`เข้าทั้งหมดวันนี้ ${selectedItems.length} ร้าน`);
+    lines.push("");
+
+    for (const topic of SUMMARY_TOPICS){
+      lines.push(topic.label);
+
+      const topicItems = selectedItems.filter((item) => !!normalizeSummarySelections(item.summarySelections)[topic.id]);
+      for (const item of topicItems){
+        const a = (item.account || "").trim();
+        const bc = (item.branchCode || "").trim();
+        const bn = (item.branchName || "").trim();
+        lines.push(`- ${[a, bc, bn].filter(Boolean).join(" ").trim()}`);
+      }
+
+      lines.push("");
+    }
+
+    return { text: lines.join("\n"), count: selectedItems.length };
+  }
+
+  async function doSummary(){
+    if (EMBED) return;
+
+    const { text, count } = buildSummaryText();
+    if (count <= 0){
+      setStatus("wait", "ยังไม่ได้ติ๊กเลือกรายการในประวัติ");
+      showToast("ยังไม่ได้เลือกประวัติ ❗");
+      return;
+    }
+
+    const ok = await copyToClipboard(text);
+    if (!ok){
+      setStatus("err", "คัดลอกสรุปยอดไม่สำเร็จ");
+      showToast("คัดลอกไม่สำเร็จ ❌");
+      return;
+    }
+
+    setStatus("ok", `คัดลอกสรุปยอดแล้ว (${count} รายการ)`);
+    showToast(`คัดลอกสรุปยอดแล้ว ✅ (${count})`);
+    openUrl(LINE_GROUPS.summary);
+    showToast("เปิด LINE กลุ่มสรุปแล้ว");
+    saveUIState();
+  }
+
+  function bindSaveOnInput(el){
+    el.addEventListener("input", () => {
+      saveFormState();
+      updatePreview();
+    });
+    el.addEventListener("change", () => {
+      saveFormState();
+      updatePreview();
+    });
+  }
+
+  function handleSkuControlChange(target){
+    const row = target.closest(".skuRow");
+    if (!row) return;
+
+    if (target.matches('[data-role="flag"]')){
+      const id = row.dataset.skuId;
+      const nextFlag = normalizeMonthlyFlag(target.value);
+      if (nextFlag) globalSkuFlags[id] = nextFlag;
+      else delete globalSkuFlags[id];
+      saveGlobalSkuFlags();
+      syncSkuRowState(row, false);
+    } else if (target.matches('[data-role="check"]')){
+      if (target.disabled) target.checked = false;
+    }
+
+    saveFormState();
+    updatePreview();
+  }
+
+  reportDate.addEventListener("change", () => {
+    syncReportDateModeFromInput();
+    saveFormState();
+    updatePreview();
+  });
+  bindSaveOnInput(account);
+  bindSaveOnInput(branchCode);
+  bindSaveOnInput(branchName);
+  bindSaveOnInput(locationArea);
+  bindSaveOnInput(issue);
+  bindSaveOnInput(note);
+  summaryTopicList.addEventListener("change", () => {
+    saveFormState();
+  });
+
+  skuBoard.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches('[data-role="flag"], [data-role="check"]')) return;
+    handleSkuControlChange(target);
+  });
+
+  btnCopy.addEventListener("click", () => doCopy({ openLine: true }));
+  btnCopyOnly.addEventListener("click", () => doCopy({ openLine: false }));
+  btnSave.addEventListener("click", doSave);
+  btnSummary.addEventListener("click", doSummary);
+  if (btnHistorySummary) btnHistorySummary.addEventListener("click", doSummary);
+
+  if (btnToggleAll) btnToggleAll.addEventListener("click", () => {
+    showAllHistory = !showAllHistory;
+    saveUIState();
+    renderHistory();
+  });
+
+  if (btnSelectAll) btnSelectAll.addEventListener("click", () => {
+    const list = getVisibleHistoryItems();
+    if (!list.length){
+      showToast("ไม่มีรายการในมุมมองนี้");
+      return;
+    }
+
+    const visibleIds = list.map((item) => item.id);
+    const allSelected = visibleIds.every((id) => selectedIds.has(id));
+    if (allSelected){
+      visibleIds.forEach((id) => selectedIds.delete(id));
+    } else {
+      visibleIds.forEach((id) => selectedIds.add(id));
+    }
+
+    saveUIState();
+    renderHistory();
+  });
+
+  if (btnClearAll) btnClearAll.addEventListener("click", () => {
+    if (!history.length){
+      showToast("ไม่มีประวัติให้ล้าง");
+      return;
+    }
+    openConfirm(
+      "ยืนยันล้างประวัติทั้งหมด",
+      `ต้องการล้างประวัติทั้งหมดใช่ไหม?\n(จะลบ ${history.length} รายการ)`,
+      () => clearAllHistory()
+    );
+  });
+
+  btnResetForm.addEventListener("click", () => {
+    openConfirm(
+      "ยืนยันล้างฟอร์ม",
+      "ต้องการล้างข้อมูลรายร้านทั้งหมดใช่ไหม?\n(สถานะ ⭐/❌ รายเดือนจะยังคงอยู่)",
+      () => {
+        account.value = "";
+        branchCode.value = "";
+        branchName.value = "";
+        locationArea.value = "";
+        issue.value = DEFAULT_ISSUE_TEMPLATE;
+        note.value = DEFAULT_NOTE_TEMPLATE;
+        clearAllSkuChecks();
+        applySummarySelectionsToDom({});
+        saveFormState();
+        updatePreview();
+        setStatus("wait", "ล้างฟอร์มแล้ว");
+        showToast("ล้างฟอร์มแล้ว");
+      }
+    );
+  });
+
+  function applyPrefill(payload){
+    payload = payload || {};
+    const own = (k) => Object.prototype.hasOwnProperty.call(payload, k);
+    const noted = normalizeNotedState((payload.noted && typeof payload.noted === "object") ? payload.noted : payload);
+
+    if (own("placeId")) embedPrefillContext.placeId = String(payload.placeId ?? "").trim();
+    if (own("reportToken")) embedPrefillContext.reportToken = String(payload.reportToken ?? "").trim();
+    if (own("sheetName")) embedPrefillContext.sheetName = String(payload.sheetName ?? "").trim();
+
+    if (own("account")) account.value = String(payload.account ?? "").trim();
+    if (own("branchCode")) branchCode.value = String(payload.branchCode ?? "").trim();
+    if (own("branchName")) branchName.value = String(payload.branchName ?? "").trim();
+
+    locationArea.value = noted.locationArea || "";
+    issue.value = issueValueOrDefault(noted.issue);
+    note.value = noteValueOrDefault(noted.note);
+    applySkuChecksToDom(noted.skuChecks || {});
+    applySummarySelectionsToDom(noted.summarySelections || {});
+    updatePreview();
+    setStatus("wait", "Prefill แล้ว (Popup)");
+  }
+
+  window.__PT_APPLY_PREFILL = applyPrefill;
+
+  window.addEventListener("message", (e) => {
+    const msg = e && e.data;
+    if (!msg || msg.type !== "PT_PREFILL") return;
+
+    try{
+      if (location.origin && e.origin && e.origin !== location.origin) return;
+    } catch (err){}
+
+    applyPrefill(msg.payload || {});
+    try{
+      const targetOrigin = (location.origin && location.origin !== "null") ? location.origin : "*";
+      window.parent && window.parent.postMessage({ type: "PT_PREFILL_ACK" }, targetOrigin);
+    } catch (err){}
+  });
+
+  function applyEmbedModeUI(){
+    if (!EMBED) return;
+    btnSummary.style.display = "none";
+    const historyCard = document.getElementById("historyCard");
+    if (historyCard) historyCard.style.display = "none";
+    setStatus("wait", "โหมด Popup: ซ่อนสรุปยอด/ประวัติแล้ว");
+  }
+
+  function escapeHtml(text){
+    return String(text ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#39;"
+    }[char]));
+  }
+
+  function escapeHtmlAttr(text){
+    return escapeHtml(text).replace(/`/g, "&#96;");
+  }
+
+  function cssEscape(value){
+    if (window.CSS && typeof window.CSS.escape === "function"){
+      return window.CSS.escape(value);
+    }
+    return String(value).replace(/"/g, '\\"');
+  }
+
+  function boot(){
+    if (HISTORY_MODE){
+      document.body.classList.add("history-only");
+      loadHistory();
+      loadUIState();
+      if (pruneSelectedIds()) saveUIState();
+      renderHistory();
+      return;
+    }
+
+    customerGroup.textContent = FIXED_CUSTOMER_GROUP;
+    renderLocationOptions();
+    renderSummaryTopics();
+    renderSkuLists();
+    loadGlobalSkuFlags();
+    applyGlobalFlagsToDom();
+    const reportDateAdjusted = loadFormState();
+    loadHistory();
+
+    if (!EMBED){
+      loadUIState();
+      if (pruneSelectedIds()) saveUIState();
+      saveHistory();
+    }
+
+    if (!reportDate.value){
+      reportDate.value = todayISO();
+      reportDateMode = REPORT_DATE_MODE_AUTO;
+    }
+    issue.value = issueValueOrDefault(issue.value);
+    note.value = noteValueOrDefault(note.value);
+
+    if (reportDateAdjusted){
+      saveReportDateStateOnly();
+    }
+
+    updatePreview();
+    applyEmbedModeUI();
+
+    if (!EMBED){
+      renderHistory();
+      setStatus("wait", "พร้อมใช้งาน");
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

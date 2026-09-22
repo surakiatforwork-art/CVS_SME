@@ -1,0 +1,3524 @@
+<!doctype html>
+<html lang="th">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#dff7ef" />
+  <title>GhostShift (by PHANToM)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;900&display=swap"
+    rel="stylesheet">
+
+  <!-- Dexie CDN (fallback to native IndexedDB if Dexie fails) -->
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.5/dist/dexie.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f6fffb;
+      --card: #ffffff;
+      --line: #d7efe7;
+      --text: #0e2a23;
+      --muted: #557c72;
+      --muted2: #7aa39a;
+      --accent: #1fbf9a;
+      --soft: #e7fbf4;
+      --warn: #ffb020;
+      --danger: #ff4d4f;
+      --shadow: 0 10px 28px rgba(14, 42, 35, .10);
+      --radius: 18px;
+
+      --stickH: 0px;
+      --topH: 0px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: calc(var(--topH) + 10px);
+      /* FIX: เพิ่มพื้นที่กัน stickyBar บัง log/เนื้อหาด้านล่าง */
+      padding-bottom: calc(var(--stickH) + 42px);
+      overflow-x: hidden;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 14px 24px;
+      overflow-x: hidden;
+    }
+
+    .mini {
+      font-size: 12px;
+      color: var(--muted2);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      margin: 12px 0;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      letter-spacing: .2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .row.spread {
+      justify-content: space-between;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    @media (min-width: 720px) {
+      .grid2 {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .grid3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(14, 42, 35, .10);
+      user-select: none;
+      touch-action: manipulation;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      width: 100%;
+      white-space: nowrap;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn[disabled] {
+      opacity: .55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn.primary {
+      background: linear-gradient(180deg, #26d7ae, #17b892);
+      border-color: rgba(0, 0, 0, .0);
+      color: #062a22;
+    }
+
+    .btn.soft {
+      background: var(--soft);
+      border-color: #c8efe3;
+    }
+
+    .btn.danger {
+      background: #fff1f1;
+      border-color: #ffd1d1;
+      color: #7c1313;
+    }
+
+    .btn.warn {
+      background: #fff7e6;
+      border-color: #ffe2ad;
+      color: #7a4e00;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fbfffd;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+      border: 1px solid var(--line);
+      background: #fbfffd;
+      white-space: nowrap;
+    }
+
+    .badge.ok {
+      background: #e7fbf4;
+      border-color: #bfeee0;
+      color: #0b5f4a;
+    }
+
+    .badge.wait {
+      background: #fff7e6;
+      border-color: #ffe2ad;
+      color: #7a4e00;
+    }
+
+    .badge.err {
+      background: #fff1f1;
+      border-color: #ffd1d1;
+      color: #7c1313;
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: #fbfffd;
+      padding: 10px 12px;
+      border-radius: 14px;
+    }
+
+    .switch input {
+      width: 22px;
+      height: 22px;
+    }
+
+    .field {
+      border: 1px solid var(--line);
+      background: #fbfffd;
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+    }
+
+    .field input,
+    .field select {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      padding: 0;
+      width: 100%;
+    }
+
+    .progressWrap {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      background: #eaf8f2;
+      border: 1px solid #cfeee4;
+      overflow: hidden;
+    }
+
+    .progressBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #26d7ae, #17b892);
+      border-radius: 999px;
+      transition: width .25s ease;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .photoItem {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: #fbfffd;
+      border-radius: 16px;
+    }
+
+    .thumb {
+      width: 92px;
+      height: 92px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      object-fit: cover;
+      background: #0b1d18;
+    }
+
+    .info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .metaTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .metaLine {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .timeText {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .timeUseRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .recoText {
+      font-size: 12px;
+      color: #0b5f4a;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .recoText.muted {
+      color: var(--muted2);
+      font-weight: 800;
+    }
+
+    .recoText.late {
+      color: #7c1313;
+    }
+
+    .btnMini {
+      width: auto;
+      min-height: 28px;
+      padding: 4px 16px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      box-shadow: none;
+      flex-shrink: 0;
+    }
+
+    .btnGroup {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .imageViewerBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .imageViewerBackdrop.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .imageViewerContent {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .imageViewerImg {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      user-select: none;
+    }
+
+    .imageViewerCloseBtn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: white;
+      font-size: 24px;
+      backdrop-filter: blur(4px);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .actions.oneCol {
+      grid-template-columns: 1fr;
+    }
+
+    .actions .btn {
+      padding: 10px 12px;
+      min-height: 40px;
+      font-size: 13px;
+    }
+
+    .spin {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #cfeee4;
+      border-top-color: #1fbf9a;
+      border-radius: 999px;
+      display: inline-block;
+      animation: spin 1s linear infinite;
+      vertical-align: -2px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .topBar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 0;
+      z-index: 70;
+      padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+      background: rgba(246, 255, 251, .92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topInner {
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .topLeft {
+      min-width: 0;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .topTitleRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .topTitle {
+      font-weight: 900;
+      letter-spacing: .2px;
+      font-size: 16px;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .topRight {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .topBtn {
+      width: auto;
+      min-width: 54px;
+      padding: 10px 12px;
+      min-height: 44px;
+      box-shadow: 0 8px 18px rgba(14, 42, 35, .08);
+    }
+
+    @media (max-width: 380px) {
+      .topBtn {
+        min-width: 48px;
+        padding: 10px 10px;
+      }
+
+      .topTitle {
+        font-size: 15px;
+      }
+
+      .topRight {
+        gap: 8px;
+      }
+    }
+
+    /* Header status: 2 lines
+       Line1: Next + DownloadNext button
+       Line2: เวลา + อีก (big) */
+    .headerLine1 {
+      display: grid;
+      grid-template-columns: minmax(110px, 140px) 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .headerLine2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .statusPill {
+      width: 100%;
+      justify-content: space-between;
+      padding: clamp(6px, 1.7vw, 8px) clamp(10px, 2.4vw, 12px);
+      font-size: clamp(11px, 3.1vw, 12px);
+    }
+
+    .statusPill b {
+      font-weight: 900;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .statusPill .k {
+      font-size: clamp(10px, 2.9vw, 11px);
+      color: var(--muted2);
+      font-weight: 900;
+    }
+
+    /* BIG emphasis for เวลา/อีก */
+    .bigStat {
+      padding: clamp(8px, 2vw, 10px) clamp(12px, 2.6vw, 14px);
+    }
+
+    .bigStat b {
+      font-size: clamp(18px, 5.6vw, 22px);
+      letter-spacing: .2px;
+    }
+
+    .bigStat .k {
+      font-size: clamp(10px, 3vw, 11px);
+    }
+
+    .headerDlBtn {
+      min-height: 44px;
+      font-size: clamp(13px, 3.4vw, 14px);
+      font-weight: 900;
+      letter-spacing: .2px;
+      box-shadow: 0 10px 22px rgba(14, 42, 35, .12);
+    }
+
+    .warnLine {
+      display: none;
+      font-size: 12px;
+      font-weight: 900;
+      color: #7c1313;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stickyBar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(246, 255, 251, .92);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--line);
+      z-index: 60;
+    }
+
+    .stickyInner {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .stickyInner .btn.bigPrimary {
+      min-height: 56px;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: .2px;
+      box-shadow: 0 10px 22px rgba(14, 42, 35, .14);
+    }
+
+    .btn.square {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
+      padding: 0;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(14, 42, 35, .10);
+    }
+
+    @media (max-width: 420px) {
+      .stickyInner {
+        gap: 8px;
+      }
+
+      .btn.square {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+        min-height: 52px;
+        border-radius: 14px;
+      }
+
+      .stickyInner .btn.bigPrimary {
+        min-height: 52px;
+        font-size: 16px;
+      }
+    }
+
+    .toastWrap {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: calc(var(--stickH) + 12px);
+      z-index: 120;
+      display: none;
+      pointer-events: none;
+    }
+
+    .toastWrap.show {
+      display: block;
+    }
+
+    .toastCard {
+      pointer-events: auto;
+      max-width: 520px;
+      margin: 0 auto;
+      background: #fbfffd;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 10px 12px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .toastText {
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 900;
+      color: #1f4a3f;
+    }
+
+    .toastSub {
+      margin-top: 3px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .toastBtn {
+      width: auto;
+      min-height: 38px;
+      padding: 8px 10px;
+      box-shadow: none;
+    }
+
+    .drawerBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 34, 28, .25);
+      display: none;
+      z-index: 95;
+    }
+
+    .drawerBackdrop.show {
+      display: block;
+    }
+
+    .drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: translateY(105%);
+      transition: transform .22s ease;
+      z-index: 100;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    }
+
+    .drawer.show {
+      transform: translateY(0%);
+    }
+
+    .drawerPanel {
+      max-width: 980px;
+      margin: 0 auto;
+      background: rgba(246, 255, 251, .96);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      max-height: 76vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawerHeader {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfffd;
+    }
+
+    .drawerBody {
+      padding: 12px 14px 14px;
+      overflow: auto;
+    }
+
+    .modalBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 34, 28, .45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 110;
+    }
+
+    .modalBackdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .modalHeader {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfffd;
+    }
+
+    .modalHeader .row {
+      flex-wrap: nowrap;
+    }
+
+    .modalBody {
+      padding: 12px 14px 14px;
+    }
+
+    .viewfinderWrap {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #061a15;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 3 / 4;
+    }
+
+    video#camVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: none;
+    }
+
+    video#camVideo.mirror {
+      transform: scaleX(-1);
+    }
+
+    .vfOverlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    .camHUD {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .camHUD .pill {
+      background: rgba(251, 255, 253, .92);
+      border-color: rgba(215, 239, 231, .95);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+      color: #1f4a3f;
+      pointer-events: none;
+    }
+
+    .camToast {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      display: none;
+      z-index: 3;
+    }
+
+    .camToast.show {
+      display: block;
+    }
+
+    .camToastInner {
+      background: rgba(231, 251, 244, .92);
+      border: 1px solid rgba(191, 238, 224, .95);
+      color: #0b5f4a;
+      border-radius: 16px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+      font-weight: 900;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .camFlash {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, .0);
+      z-index: 4;
+      pointer-events: none;
+      transition: background .15s ease;
+    }
+
+    .camFlash.on {
+      background: rgba(255, 255, 255, .55);
+    }
+
+    details.logPanel {
+      border: 1px dashed #cfeee4;
+      border-radius: 16px;
+      padding: 10px 12px;
+      background: #fbfffd;
+    }
+
+    details.logPanel summary {
+      cursor: pointer;
+      font-weight: 900;
+      color: var(--muted);
+    }
+
+    pre#logBox {
+      margin: 10px 0 0;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #1f4a3f;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topBar" id="topBar">
+    <div class="topInner">
+      <div class="topLeft">
+        <div class="topTitleRow">
+          <span class="badge ok" id="lineScheduleBadge" style="display:none">🔔 -</span>
+
+          <div class="topTitle">GhostShift</div>
+          <span class="badge wait" id="saveStateBadge">พร้อมใช้งาน</span>
+          <span class="pill" id="headerGoalPill">DL: <b id="dlCountTop">0</b>/40</span>
+        </div>
+
+        <!-- Line 1: Next + DownloadNext -->
+        <div class="headerLine1">
+          <div class="pill statusPill">
+            <span class="k">Next</span>
+            <b id="headerNextText">-</b>
+          </div>
+          <button class="btn primary headerDlBtn" id="downloadNextBtn">⬇ โหลดภาพถัดไป</button>
+        </div>
+
+        <!-- Line 2: เวลา + อีก (BIG) -->
+        <div class="headerLine2">
+          <div class="pill statusPill bigStat">
+            <span class="k">เวลา</span>
+            <b id="headerWhenText">-</b>
+          </div>
+          <div class="pill statusPill bigStat">
+            <span class="k">อีก</span>
+            <b id="headerCountdownText">-</b>
+          </div>
+        </div>
+
+        <div class="warnLine" id="headerWarnLine">⚠ -</div>
+
+        <div class="mini muted" id="headerHint">
+          • LINE (ถ้าเปิด) จะส่ง “ตอนถึงเวลา” เท่านั้น
+        </div>
+      </div>
+
+      <div class="topRight">
+        <button class="btn topBtn" id="openDrawerBtn" title="ดูรายการ Downloaded">✅</button>
+        <button class="btn soft topBtn" id="openSettingsBtn" title="Settings / LINE">⚙️</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toastWrap" id="toastWrap">
+    <div class="toastCard">
+      <div>
+        <div class="toastText" id="toastText">ครบเวลาแล้ว</div>
+        <div class="toastSub" id="toastSub">-</div>
+      </div>
+      <button class="btn soft toastBtn" id="toastDismissBtn">ปิด</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section class="card">
+      <h2>
+        <span>Pending (ยังไม่โหลด)</span>
+        <span class="badge wait" id="pendingBadge">0</span>
+      </h2>
+      <div class="list" id="pendingList"></div>
+      <div class="mini muted" id="pendingEmpty" style="display:none">ยังไม่มีรายการ Pending</div>
+    </section>
+
+    <section class="card">
+      <h2>
+        <span>Progress (Downloaded)</span>
+        <span class="badge ok" id="goalBadge" style="display:none">ครบ 40 แล้ว ✅</span>
+      </h2>
+
+      <div class="row spread">
+        <div class="pill">Total: <b id="totalCount">0</b> • Downloaded: <b id="downloadedCount">0</b> • Pending: <b
+            id="pendingCount">0</b></div>
+        <div class="pill">เป้าหมาย: <b>40</b> รูป</div>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="progressWrap">
+        <div class="progressBar" id="progressBar"></div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="grid3">
+        <div class="switch">
+          <input type="checkbox" id="mirrorHintToggle" checked />
+          <div>
+            <div style="font-weight:900;font-size:13px">กล้องหน้าแบบกระจก (Mirror)</div>
+            <div class="mini muted">พรีวิว & ภาพที่บันทึกจะเหมือนกัน</div>
+          </div>
+        </div>
+
+        <div class="switch">
+          <input type="checkbox" id="autoWakeToggle" checked />
+          <div>
+            <div style="font-weight:900;font-size:13px">Catch-up เมื่อกลับมาเปิด</div>
+            <div class="mini muted">ถ้าเลยเวลาแล้วจะขึ้น toast</div>
+          </div>
+        </div>
+
+        <div class="switch">
+          <input type="checkbox" id="logToggle" />
+          <div>
+            <div style="font-weight:900;font-size:13px">เปิด Log panel</div>
+            <div class="mini muted">ใช้ debug บนมือถือ</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="grid2">
+        <div class="card" style="margin:0; box-shadow:none">
+          <div class="row spread">
+            <span class="badge" id="timerLockBadge">-</span>
+            <span class="pill" id="timerLeftPill">เหลือ: -</span>
+          </div>
+          <div style="height:8px"></div>
+          <div class="mini muted" id="timerMeta">startAt: - • targetAt: -</div>
+          <div style="height:8px"></div>
+          <div class="mini muted">
+            * รีเซ็ตเวลาได้เมื่อ “ปลดล็อค” โดยต้องมีรูปครบคู่ถึง OUT-20 (อย่างน้อย 40 รูป) และดาวน์โหลด
+            OUT-ภาพสุดท้ายแล้ว
+          </div>
+        </div>
+
+        <div class="card" style="margin:0; box-shadow:none">
+          <div class="row spread">
+            <span class="badge" id="alarmBadge">ยังไม่ตั้ง</span>
+            <span class="pill" id="alarmLeftPill">เหลือ: -</span>
+          </div>
+          <div style="height:8px"></div>
+          <div class="mini muted" id="alarmMeta">next: - • dueAt: -</div>
+          <div style="height:8px"></div>
+          <div class="row">
+            <button class="btn soft btnMini" id="requestNotifBtn" style="width:auto">🔔 ขอสิทธิ์</button>
+            <button class="btn btnMini" id="testBeepBtn" style="width:auto">🔊 ทดสอบเสียง/สั่น</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <details class="logPanel" id="logPanel" style="display:none">
+        <summary>Log panel (แตะเพื่อเปิด/ปิด)</summary>
+        <pre id="logBox"></pre>
+      </details>
+    </section>
+  </div>
+
+  <!-- Sticky: Start + Camera + Upload (แทนที่ unlock/delete เดิม) -->
+  <div class="stickyBar" id="stickyBar">
+    <div class="stickyInner">
+      <button class="btn primary bigPrimary" id="start910Btn">⏱️ เริ่มนับเวลา</button>
+      <button class="btn warn square" id="openCameraStickyBtn" title="ถ่ายภาพ">📷</button>
+      <button class="btn soft square" id="uploadStickyBtn" title="เลือกภาพจากเครื่อง">🖼️</button>
+    </div>
+  </div>
+
+  <div class="drawerBackdrop" id="drawerBackdrop"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawerPanel">
+      <div class="drawerHeader">
+        <div class="row" style="gap:10px">
+          <span class="badge ok">Downloaded</span>
+          <span class="pill">ทั้งหมด: <b id="drawerDownloadedCount">0</b></span>
+        </div>
+        <div class="row" style="gap:10px">
+          <button class="btn soft btnMini" id="closeDrawerBtn" style="width:auto">ปิด</button>
+        </div>
+      </div>
+      <div class="drawerBody">
+        <div class="list" id="downloadedList"></div>
+        <div class="mini muted" id="downloadedEmpty" style="display:none">ยังไม่มีรายการ Downloaded</div>
+
+        <div style="height:12px"></div>
+        <!-- ย้ายปุ่มลบทั้งหมดมาล่างสุดของ Downloaded -->
+        <button class="btn danger" id="deleteAllBtnDrawer">🧨 ลบรูปทั้งหมด + รีเซ็ตเวลา</button>
+        <div style="height:8px"></div>
+        <div class="mini muted">* มี confirm 2 ชั้น กันกดพลาด</div>
+      </div>
+    </div>
+  </div>
+
+  <input id="fileInputAdd" type="file" accept="image/*" multiple style="display:none" />
+  <input id="fileInputReplace" type="file" accept="image/*" style="display:none" />
+
+  <div class="modalBackdrop" id="camModalBackdrop">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="row" style="gap:10px">
+          <span class="badge ok" id="camModeBadge">CAM</span>
+          <span class="pill" id="camFacingPill">facing: -</span>
+          <span class="pill" id="camMirrorPill">mirror: -</span>
+          <span class="badge wait" id="replaceBadge" style="display:none">REPLACE -</span>
+        </div>
+        <div class="row" style="gap:10px">
+          <button class="btn soft" id="switchCamBtn" style="width:auto">🔄</button>
+          <button class="btn" id="closeCamBtn" style="width:auto">✖</button>
+        </div>
+      </div>
+
+      <div class="modalBody">
+        <div class="viewfinderWrap">
+          <video id="camVideo" playsinline autoplay muted></video>
+
+          <div class="camHUD">
+            <span class="pill" id="camCountPill">📸 Total: 0</span>
+            <span class="pill" id="camNextPill">Next: -</span>
+          </div>
+
+          <div class="camToast" id="camToast">
+            <div class="camToastInner" id="camToastInner">บันทึกแล้ว</div>
+          </div>
+
+          <div class="camFlash" id="camFlash"></div>
+          <div class="vfOverlay"></div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="grid2">
+          <button class="btn primary" id="captureBtn">📸 ถ่ายภาพ</button>
+          <button class="btn soft" id="fallbackUploadBtn">🖼️ อัปโหลดแทน</button>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="mini muted" id="camHint">
+          กล้องหน้า: พรีวิวเป็นกระจก และภาพที่บันทึกจะ “เหมือนที่เห็น” • ถ้ากล้องใช้ไม่ได้ กดอัปโหลดแทน
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================
+       Settings Modal (LINE)
+       - ซ่อน Worker URL (ฝังในโค้ด)
+       ========================= -->
+  <div class="modalBackdrop" id="settingsBackdrop">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="row" style="gap:10px">
+          <span class="badge ok">SETTINGS</span>
+          <span class="pill">LINE Schedule</span>
+        </div>
+        <div class="row" style="gap:10px">
+          <button class="btn" id="closeSettingsBtn" style="width:auto">✖</button>
+        </div>
+      </div>
+
+      <div class="modalBody">
+        <div class="switch">
+          <input type="checkbox" id="lineEnableToggle" />
+          <div>
+            <div style="font-weight:900;font-size:13px">เปิดใช้แจ้งเตือนผ่าน LINE (Worker schedule)</div>
+            <div class="mini muted">ส่งเฉพาะ “ตอนถึงเวลา” + ส่ง “เริ่มงานวันนี้” เมื่อโหลด IN-1 ครั้งแรกของวัน</div>
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <!-- LINE Schedule Status Display -->
+        <div id="lineCurrentScheduleInfo" class="field" style="display:none;background:#e7fbf4;border-color:#bfeee0">
+          <label>📅 Schedule ปัจจุบัน</label>
+          <div id="lineScheduleStatusText" style="font-weight:700;color:#0b5f4a">-</div>
+        </div>
+
+        <div style="height:10px"></div>
+
+
+        <div class="field">
+          <label>LINE Code (ตั้งเอง)</label>
+          <input id="lineCodeInput" autocomplete="off" placeholder="" />
+          <div class="mini muted">โค้ดนี้ใช้คู่กับคำสั่ง <b>LINK</b> ใน LINE OA เพื่อเชื่อมบัญชี</div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid2">
+          <button class="btn primary" id="lineLinkBtn">🔗 ลิงก์กับ LINE (คัดลอก LINK + พาไป OA)</button>
+          <button class="btn soft" id="lineTestBtn">🧪 ทดสอบแจ้งเตือน</button>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid2">
+          <button class="btn danger" id="lineClearBtn">🧹 ล้างค่า LINE</button>
+          <button class="btn" id="lineStatusBtn">ℹ️ ดูสถานะ</button>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="mini muted">
+          วิธีลิงก์ (ครั้งแรกเท่านั้น): กด “ลิงก์กับ LINE” → ระบบคัดลอกข้อความ <b>LINK &lt;code&gt;</b> → เปิด LINE OA →
+          วาง (paste) และส่ง → กลับมาที่เว็บ กด “ทดสอบแจ้งเตือน”
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================
+       Quick Link Popup
+       (กรณียังไม่ตั้งค่า/ยังไม่ลิงก์)
+       ========================= -->
+  <div class="modalBackdrop" id="lineQuickLinkBackdrop">
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="row" style="gap:10px">
+          <span class="badge wait">LINE SETUP</span>
+          <span class="pill">เชื่อมต่อ OA</span>
+        </div>
+        <div class="row" style="gap:10px">
+          <button class="btn" id="closeQuickLinkBtn" style="width:auto">✖</button>
+        </div>
+      </div>
+
+      <div class="modalBody">
+        <div class="field">
+          <label>ตั้งชื่อ/โค้ด</label>
+          <input id="quickLinkCodeInput" autocomplete="off" placeholder="" />
+          <div class="mini muted">ระบบจะคัดลอก: <b>LINK &lt;โค้ด&gt;</b> ให้ทันที</div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid2">
+          <button class="btn primary" id="quickLinkGoBtn">คัดลอก “LINK …” & ไป LINE</button>
+          <button class="btn soft" id="quickLinkLaterBtn">ไว้ก่อน</button>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="mini muted">
+          หลังเปิด LINE OA แล้ว: วาง (paste) ข้อความที่คัดลอกไว้ → ส่ง → กลับมาเว็บแล้วกด “ทดสอบแจ้งเตือน”
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // ฝัง Worker URL (ซ่อนจากผู้ใช้)
+    const DEFAULT_LINE_WORKER_URL = "https://phantom-selfie-line.surakiatforwork.workers.dev";
+
+    const LS = {
+      timer910: "stl_timer910_state",
+      alarm: "stl_alarm_state",
+      ui: "stl_ui_state",
+      line: "stl_line_schedule_cfg"
+    };
+
+    const state = {
+      db: null,
+      dbType: "unknown",
+      photos: [],
+      thumbUrl: new Map(),
+
+      busy: { saving: false },
+
+      cam: { stream: null, facing: "user" },
+
+      ui: { logEnabled: false, autoWake: true, mirrorPref: true },
+
+      replace: { active: false, targetId: null, targetTag: null },
+
+      // locked: true ตอนเริ่มนับเวลา
+      // จะปลดล็อคเมื่อ: มีคู่ครบถึง OUT-20 (อย่างน้อย 40) + ดาวน์โหลด OUT-ภาพสุดท้าย (OUT-n) แล้ว
+      timer910: { running: false, locked: false, startAt: null, targetAt: null },
+
+      alarm: { dueAt: null, nextTag: null, firedDueAt: null },
+      alarmTimeout: null,
+
+      schedule: {
+        ok: false,
+        error: "",
+        warn: "",
+        nextTag: null,
+        nextAt: null,
+        planAtById: new Map(),
+        source: { lastDownloadedTag: null, lastDownloadedAt: null }
+      },
+
+      line: {
+        enabled: false,
+        workerUrl: DEFAULT_LINE_WORKER_URL, // hidden
+        code: "",
+        lastScheduleKey: "",
+        lastScheduledCode: "",   // NEW: จำโค้ดที่ “เคย schedule สำเร็จล่าสุด” เพื่อ cleanup/cancel ได้ถูก
+        lastStartDate: ""        // YYYY-MM-DD
+      },
+
+      tickInterval: null,
+      toastTimer: null
+    };
+
+    function now() { return Date.now(); }
+
+    function fmtDT(ts) {
+      if (!ts) return "-";
+      try {
+        return new Date(ts).toLocaleString("th-TH", {
+          year: "2-digit", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", second: "2-digit"
+        });
+      } catch (_) {
+        return new Date(ts).toString();
+      }
+    }
+    function fmtDateOnly(ts) {
+      if (!ts) return "-";
+      try {
+        return new Date(ts).toLocaleDateString("th-TH", {
+          year: "2-digit", month: "2-digit", day: "2-digit"
+        });
+      } catch (_) {
+        const d = new Date(ts);
+        const yy = String(d.getFullYear()).slice(-2);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${dd}/${mm}/${yy}`;
+      }
+    }
+    function fmtTimeOnly(ts) {
+      if (!ts) return "-";
+      try {
+        return new Date(ts).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+      } catch (_) {
+        const d = new Date(ts);
+        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      }
+    }
+    function fmtHMS(ms) {
+      if (ms == null) return "-";
+      const sign = ms < 0 ? "-" : "";
+      ms = Math.abs(ms);
+      const s = Math.floor(ms / 1000);
+      const hh = Math.floor(s / 3600);
+      const mm = Math.floor((s % 3600) / 60);
+      const ss = s % 60;
+      return `${sign}${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+    }
+
+    function loadJSON(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw);
+      } catch (_) { return fallback; }
+    }
+    function saveJSON(key, obj) {
+      try { localStorage.setItem(key, JSON.stringify(obj)); } catch (_) { }
+    }
+
+    function setSaveState(text, mode) {
+      const b = $("saveStateBadge");
+      b.className = "badge " + (mode || "wait");
+      b.innerHTML = text;
+    }
+
+    function log(...args) {
+      const line = `[${new Date().toLocaleTimeString("th-TH")}] ` + args.map(a => {
+        if (typeof a === "string") return a;
+        try { return JSON.stringify(a); } catch (_) { return String(a); }
+      }).join(" ");
+      if (state.ui.logEnabled) {
+        const box = $("logBox");
+        box.textContent = (line + "\n" + box.textContent).slice(0, 16000);
+      }
+      console.log(...args);
+    }
+
+    async function tryPersistStorage() {
+      try {
+        if (navigator.storage && navigator.storage.persist) {
+          const granted = await navigator.storage.persist();
+          log("Storage persist:", granted);
+        }
+      } catch (_) { }
+    }
+
+    // =========================
+    // LINE schedule helpers
+    // =========================
+    function loadLineCfg() {
+      const cfg = loadJSON(LS.line, null);
+      if (cfg && typeof cfg === "object") {
+        state.line.enabled = !!cfg.enabled;
+        state.line.code = cfg.code ? String(cfg.code) : "";
+        state.line.lastScheduleKey = cfg.lastScheduleKey ? String(cfg.lastScheduleKey) : "";
+        state.line.lastScheduledCode = cfg.lastScheduledCode ? String(cfg.lastScheduledCode) : "";
+        state.line.lastStartDate = cfg.lastStartDate ? String(cfg.lastStartDate) : "";
+        // workerUrl hidden แต่ยังรองรับข้อมูลเก่าที่เคยเก็บไว้
+        state.line.workerUrl = (cfg.workerUrl ? String(cfg.workerUrl) : DEFAULT_LINE_WORKER_URL) || DEFAULT_LINE_WORKER_URL;
+      }
+      state.line.workerUrl = String(state.line.workerUrl || DEFAULT_LINE_WORKER_URL).trim().replace(/\/+$/, "");
+      if (!state.line.workerUrl) state.line.workerUrl = DEFAULT_LINE_WORKER_URL;
+    }
+    function saveLineCfg() {
+      saveJSON(LS.line, {
+        enabled: state.line.enabled,
+        // เก็บไว้ได้ แต่ UI ไม่โชว์
+        workerUrl: String(state.line.workerUrl || DEFAULT_LINE_WORKER_URL).trim().replace(/\/+$/, ""),
+        code: String(state.line.code || "").trim(),
+        lastScheduleKey: String(state.line.lastScheduleKey || ""),
+        lastScheduledCode: String(state.line.lastScheduledCode || ""),
+        lastStartDate: String(state.line.lastStartDate || "")
+      });
+    }
+
+    async function copyTextToClipboard(text) {
+      text = String(text || "");
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (_) { }
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch (_) { }
+      return false;
+    }
+
+    function openSettings() {
+      $("settingsBackdrop").classList.add("show");
+      syncLineUIFromState();
+    }
+    function closeSettings() {
+      $("settingsBackdrop").classList.remove("show");
+    }
+
+    // Flag to prevent multiple quick link popups (Bug #4 fix)
+    let _quickLinkPopupOpen = false;
+
+    function openQuickLink(prefill = "") {
+      if (_quickLinkPopupOpen) return;
+      _quickLinkPopupOpen = true;
+      $("lineQuickLinkBackdrop").classList.add("show");
+      $("quickLinkCodeInput").value = String(prefill || state.line.code || "").trim();
+      setTimeout(() => $("quickLinkCodeInput").focus(), 50);
+    }
+    function closeQuickLink() {
+      _quickLinkPopupOpen = false;
+      $("lineQuickLinkBackdrop").classList.remove("show");
+    }
+
+    function ensureLineReadyOrPrompt() {
+      if (!state.line.enabled) return false;
+      const code = String(state.line.code || "").trim();
+      if (!code) {
+        openQuickLink(code);
+        return false;
+      }
+      return true;
+    }
+
+    async function linePost(path, payload, timeoutMs = 8000) {
+      const base = String(state.line.workerUrl || DEFAULT_LINE_WORKER_URL).trim().replace(/\/+$/, "");
+      const url = base + path;
+
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload || {}),
+          signal: ctrl.signal
+        });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (_) { json = { ok: res.ok, status: res.status, detail: text }; }
+        return { res, json };
+      } finally {
+        clearTimeout(t);
+      }
+    }
+
+    // NEW: ตรวจ code not linked แบบแน่นขึ้น (รองรับ 403/404)
+    function isCodeNotLinked(res, json) {
+      const st = res ? res.status : (json && json.status);
+      if (st === 403 || st === 404) return true;
+      const msg = String((json && (json.error || json.detail || json.message)) || "").toLowerCase();
+      return msg.includes("not linked") || msg.includes("code not linked") || msg.includes("forbidden");
+    }
+
+    // Retry state for start-day notification (Issue #7 fix)
+    let _startDayRetryCount = 0;
+    const MAX_START_DAY_RETRIES = 2;
+
+    async function lineNotifyStartDayIfNeeded() {
+      if (!state.line.enabled) return;
+      if (!ensureLineReadyOrPrompt()) return;
+
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      const ymd = `${yyyy}-${mm}-${dd}`;
+
+      if (state.line.lastStartDate === ymd) return;
+
+      const code = String(state.line.code).trim();
+      const msg = `เริ่มงานวันนี้ ${fmtDateOnly(Date.now())}`;
+
+      try {
+        const { res, json } = await linePost("/notify", { code, message: msg }, 9000);
+        if (json && json.ok) {
+          state.line.lastStartDate = ymd;
+          saveLineCfg();
+          log("LINE start-day sent:", msg);
+          _startDayRetryCount = 0;  // Reset on success
+        } else {
+          log("LINE start-day failed:", json);
+          if (isCodeNotLinked(res, json)) {
+            showToast("ยังไม่ลิงก์ LINE", "กดลิงก์กับ LINE แล้วส่งคำว่า LINK ... ใน OA", 5200);
+            openQuickLink(code);
+          } else {
+            showToast("ส่ง LINE ไม่สำเร็จ", (json && (json.error || json.detail)) ? String(json.error || json.detail).slice(0, 160) : "ตรวจสอบ Worker/เน็ต", 5200);
+            // Retry after 30 seconds if not reached max
+            if (_startDayRetryCount < MAX_START_DAY_RETRIES) {
+              _startDayRetryCount++;
+              setTimeout(() => lineNotifyStartDayIfNeeded(), 30000);
+              log("LINE start-day will retry in 30s, attempt:", _startDayRetryCount);
+            }
+          }
+        }
+      } catch (e) {
+        log("LINE notify error:", e && (e.name || e.message) ? (e.name || e.message) : e);
+        showToast("ส่ง LINE ไม่สำเร็จ", "เช็ค Worker/อินเทอร์เน็ต", 5200);
+        // Retry on network error
+        if (_startDayRetryCount < MAX_START_DAY_RETRIES) {
+          _startDayRetryCount++;
+          setTimeout(() => lineNotifyStartDayIfNeeded(), 30000);
+          log("LINE start-day will retry in 30s (network error), attempt:", _startDayRetryCount);
+        }
+      }
+    }
+
+    function clampDueAtMs(rawDueAtMs) {
+      // NEW: ส่งล่วงหน้า 10 วินาที + ต้องเป็น “อนาคต” เสมอ
+      const earlyMs = 10000;
+      const minFuture = now() + 800;
+      const due = Math.round(rawDueAtMs || 0) - earlyMs;
+      return Math.max(minFuture, due);
+    }
+
+    // NEW: cancel schedule แบบระบุโค้ด (ใช้ตอนเปลี่ยน code / boot cleanup)
+    async function lineCancelScheduleForCode(code, reason = "") {
+      const c = String(code || "").trim();
+      if (!c) return;
+      try {
+        const { json } = await linePost("/cancel", { code: c }, 9000);
+        log("LINE cancel:", reason, json);
+      } catch (e) {
+        log("LINE cancel error:", reason, e && (e.name || e.message) ? (e.name || e.message) : e);
+      }
+    }
+
+    async function lineScheduleNextFromCurrentSchedule(reason = "") {
+      if (!state.line.enabled) return;
+      if (!ensureLineReadyOrPrompt()) return;
+
+      const s = state.schedule;
+      // Bug #3 fix: Cancel existing schedule if schedule is now invalid
+      if (!s || s.error || !s.nextAt || !s.nextTag) {
+        if (state.line.lastScheduleKey) {
+          void lineCancelSchedule("schedule now invalid: " + String(s?.error || "no nextAt/nextTag"));
+        }
+        renderLineStatusBadge(false, null);
+        return;
+      }
+
+      // สำคัญ: schedule ไป Worker “หลังมีการดาวน์โหลดแล้ว” เท่านั้น
+      if (!s.source || !s.source.lastDownloadedAt) return;
+
+      const dueAtMs = clampDueAtMs(s.nextAt);
+      const nextTag = String(s.nextTag);
+
+      // NEW: แจ้งเตือนล่วงหน้า 10 วิ (ให้ข้อความตรงความจริง)
+      const message = nextTag.startsWith("OUT-")
+        ? "อีก 10 วินาที: ถึงเวลา Check Out"
+        : "อีก 10 วินาที: ถึงเวลา Check In";
+
+      const scheduleKey = `${nextTag}@${dueAtMs}`;
+
+      if (state.line.lastScheduleKey === scheduleKey) return;
+
+      const code = String(state.line.code).trim();
+      try {
+        const { res, json } = await linePost("/schedule", { code, dueAtMs, message, scheduleKey }, 9000);
+        if (json && json.ok) {
+          state.line.lastScheduleKey = scheduleKey;
+          state.line.lastScheduledCode = code; // NEW
+          saveLineCfg();
+          log("LINE scheduled:", { scheduleKey, dueAtMs, message, reason });
+          // UI Issue #1: Update badge in header
+          renderLineStatusBadge(true, fmtTimeOnly(dueAtMs));
+        } else {
+          log("LINE schedule failed:", json);
+          state.line.lastScheduleKey = "";
+          saveLineCfg();
+
+          if (isCodeNotLinked(res, json)) {
+            showToast("ยังไม่ลิงก์ LINE", "กดลิงก์กับ LINE แล้วส่งคำว่า LINK ... ใน OA", 5200);
+            openQuickLink(code);
+          } else {
+            showToast("ตั้งเวลา LINE ไม่สำเร็จ", (json && (json.error || json.detail)) ? String(json.error || json.detail).slice(0, 160) : "ตรวจสอบ Worker", 5200);
+          }
+        }
+      } catch (e) {
+        log("LINE schedule error:", e && (e.name || e.message) ? (e.name || e.message) : e);
+        state.line.lastScheduleKey = "";
+        saveLineCfg();
+        showToast("ตั้งเวลา LINE ไม่สำเร็จ", "เช็ค Worker/อินเทอร์เน็ต", 5200);
+      }
+    }
+
+    async function lineCancelSchedule(reason = "") {
+      if (!state.line.enabled) return;
+      // ใช้โค้ดที่เคย schedule สำเร็จล่าสุดก่อน (กันกรณี user เปลี่ยน code แล้ว)
+      const code = String(state.line.lastScheduledCode || state.line.code || "").trim();
+      if (!code) return;
+
+      try {
+        const { json } = await linePost("/cancel", { code }, 9000);
+        log("LINE cancel:", reason, json);
+      } catch (e) {
+        log("LINE cancel error:", reason, e && (e.name || e.message) ? (e.name || e.message) : e);
+      } finally {
+        state.line.lastScheduleKey = "";
+        state.line.lastScheduledCode = "";
+        saveLineCfg();
+      }
+    }
+
+    function syncLineUIFromState() {
+      $("lineEnableToggle").checked = !!state.line.enabled;
+      $("lineCodeInput").value = state.line.code || "";
+      updateLineScheduleInfoInSettings();
+    }
+
+    // UI Issue #1: Render LINE schedule badge in header
+    function renderLineStatusBadge(active, timeText) {
+      const badge = $("lineScheduleBadge");
+      if (!badge) return;
+      if (active && timeText) {
+        badge.style.display = "";
+        badge.textContent = `🔔 ${timeText}`;
+        badge.className = "badge ok";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+
+    // UI Issue #3: Update schedule info in Settings modal
+    function updateLineScheduleInfoInSettings() {
+      const infoDiv = $("lineCurrentScheduleInfo");
+      const textDiv = $("lineScheduleStatusText");
+      if (!infoDiv || !textDiv) return;
+
+      if (!state.line.enabled || !state.line.lastScheduleKey) {
+        infoDiv.style.display = "none";
+        return;
+      }
+
+      infoDiv.style.display = "";
+      const parts = state.line.lastScheduleKey.split("@");
+      const tag = parts[0] || "-";
+      const dueMs = parseInt(parts[1], 10);
+      const timeStr = dueMs ? fmtTimeOnly(dueMs) : "-";
+      textDiv.textContent = `🔔 เตือน ${tag} เมื่อ ${timeStr}`;
+    }
+    function syncLineStateFromUI() {
+      state.line.enabled = $("lineEnableToggle").checked;
+      state.line.code = String($("lineCodeInput").value || "").trim();
+      // workerUrl ซ่อน แต่ใช้ค่าฝัง
+      state.line.workerUrl = DEFAULT_LINE_WORKER_URL;
+      saveLineCfg();
+    }
+
+    async function doLinkFlowFromSettings() {
+      syncLineStateFromUI();
+      openQuickLink(state.line.code);
+      closeSettings();
+    }
+
+    async function doQuickLinkCopyAndGo() {
+      const code = String($("quickLinkCodeInput").value || "").trim();
+      if (!code) {
+        showToast("กรอกโค้ดก่อน", "เช่น PHANTOM1 หรือชื่อที่คุณต้องการ", 2500);
+        return;
+      }
+
+      state.line.code = code;
+      state.line.workerUrl = DEFAULT_LINE_WORKER_URL;
+      state.line.enabled = true;
+      // เคลียร์ เพื่อให้ schedule ถูกส่งแน่นอนหลังคำนวณ
+      state.line.lastScheduleKey = "";
+      saveLineCfg();
+
+      const script = `LINK ${code}`;
+      const ok = await copyTextToClipboard(script);
+
+      try {
+        window.open("https://lin.ee/JAWNRsq", "_blank", "noopener,noreferrer");
+      } catch (_) { }
+
+      closeQuickLink();
+      showToast(
+        ok ? "คัดลอกแล้ว ✅" : "คัดลอกไม่สำเร็จ",
+        ok ? `ไปที่ LINE แล้ววาง/ส่ง: ${script}` : `กรุณาคัดลอกเอง: ${script}`,
+        6500
+      );
+    }
+
+    async function doLineTest() {
+      syncLineStateFromUI();
+      if (!ensureLineReadyOrPrompt()) return;
+
+      const code = String(state.line.code).trim();
+      try {
+        const { res, json } = await linePost("/notify", { code, message: "ทดสอบการแจ้งเตือนจาก GhostShift" }, 9000);
+        if (json && json.ok) {
+          showToast("ส่งทดสอบแล้ว ✅", "เช็ค LINE ของคุณ", 3500);
+        } else {
+          log("LINE test failed:", json);
+          if (isCodeNotLinked(res, json)) {
+            showToast("ยังไม่ลิงก์ LINE", "กดลิงก์กับ LINE แล้วส่งคำว่า LINK ... ใน OA", 5200);
+            openQuickLink(code);
+          } else {
+            showToast("ทดสอบไม่สำเร็จ", (json && (json.error || json.detail)) ? String(json.error || json.detail).slice(0, 160) : "ตรวจสอบ Worker", 5200);
+          }
+        }
+      } catch (e) {
+        log("LINE test error:", e && (e.name || e.message) ? (e.name || e.message) : e);
+        showToast("ทดสอบไม่สำเร็จ", "เช็ค Worker/อินเทอร์เน็ต", 5200);
+      }
+    }
+
+    async function doLineStatus() {
+      syncLineStateFromUI();
+      const code = String(state.line.code || "").trim();
+      if (!code) {
+        showToast("ยังไม่ตั้งค่า", "กรอก Code ก่อน", 3500);
+        return;
+      }
+      try {
+        const base = DEFAULT_LINE_WORKER_URL.replace(/\/+$/, "");
+        const url = base + "/status?code=" + encodeURIComponent(code);
+        const res = await fetch(url, { method: "GET" });
+        const txt = await res.text();
+        let json = null;
+        try { json = JSON.parse(txt); } catch (_) { }
+        if (json) {
+          // UI Issue #2: Show more detailed status
+          const alarmTime = json.alarmAt ? fmtDT(json.alarmAt) : "-";
+          const schedKey = json.scheduleKey || "-";
+          const msgPreview = json.message ? String(json.message).slice(0, 30) : "-";
+          showToast(
+            "LINE Schedule Status",
+            `⏰ ${alarmTime} • 📝 ${msgPreview}`,
+            8000
+          );
+          log("LINE status:", json);
+        } else {
+          showToast("STATUS", txt.slice(0, 160), 6500);
+          log("LINE status raw:", txt);
+        }
+      } catch (e) {
+        showToast("STATUS ไม่สำเร็จ", "เช็ค Worker/อินเทอร์เน็ต", 4500);
+        log("LINE status error:", e);
+      }
+    }
+
+    function maybeSyncLineSchedule(reason) {
+      // เรียกหลัง schedule คำนวณใหม่ (add/replace/delete/download/reset ฯลฯ)
+      if (!state.line.enabled) return;
+      const code = String(state.line.code || "").trim();
+      if (!code) return;
+      if (!state.timer910.running) return;
+
+      // NEW: ส่งไป worker ทุกครั้งที่เวลามีการอัปเดท (ไม่จำกัดแค่ตอนมี download แล้ว)
+      // ถ้าคำนวณไม่ได้/มี error -> cancel schedule เดิม กันแจ้งเตือนหลง
+      if (!state.schedule || state.schedule.error || !state.schedule.nextAt || !state.schedule.nextTag) {
+        if (state.line.lastScheduleKey || state.line.lastScheduledCode) {
+          void lineCancelSchedule("schedule invalid: " + String(state.schedule?.error || ""));
+        }
+        return;
+      }
+
+      void lineScheduleNextFromCurrentSchedule(reason);
+    }
+
+    // =========================
+    // Slot/Tag helpers
+    // =========================
+    function parseTag(tag) {
+      const m = String(tag || "").trim().match(/^(IN|OUT)-(\d+)$/i);
+      if (!m) return null;
+      return { kind: m[1].toUpperCase(), idx: parseInt(m[2], 10) };
+    }
+    function ensureKindIdx(photo) {
+      if (photo && (!photo.kind || !photo.idx) && photo.tag) {
+        const p = parseTag(photo.tag);
+        if (p) { photo.kind = p.kind; photo.idx = p.idx; }
+      }
+      return photo;
+    }
+
+    function computeNextSlot(photos) {
+      const occ = new Map();
+      for (const raw of photos) {
+        const p = ensureKindIdx(raw);
+        if (!p || !p.kind || !p.idx) continue;
+        const o = occ.get(p.idx) || { IN: false, OUT: false };
+        if (p.kind === "IN") o.IN = true;
+        if (p.kind === "OUT") o.OUT = true;
+        occ.set(p.idx, o);
+      }
+      let i = 1;
+      while (true) {
+        const o = occ.get(i) || { IN: false, OUT: false };
+        if (!o.IN) return { tag: `IN-${i}`, kind: "IN", idx: i };
+        if (!o.OUT) return { tag: `OUT-${i}`, kind: "OUT", idx: i };
+        i++;
+      }
+    }
+    function peekNextTag() { return computeNextSlot(state.photos).tag; }
+    function nextTagInSequence(tag) {
+      const p = parseTag(tag);
+      if (!p) return null;
+      if (p.kind === "IN") return `OUT-${p.idx}`;
+      return `IN-${p.idx + 1}`;
+    }
+
+    // ปลดล็อคใหม่: ต้องมี “คู่ครบถึง OUT-20 เป็นขั้นต่ำ” และ download OUT-ภาพสุดท้าย (OUT-n) แล้ว
+    function getUnlockMaxPairIfEligible() {
+      const map = new Map(); // idx -> {IN,OUT}
+      for (const raw of state.photos) {
+        const p = ensureKindIdx(raw);
+        if (!p || !p.idx || !p.kind) continue;
+        const o = map.get(p.idx) || { IN: false, OUT: false };
+        if (p.kind === "IN") o.IN = true;
+        if (p.kind === "OUT") o.OUT = true;
+        map.set(p.idx, o);
+      }
+      let maxPair = 0;
+      for (const [idx, o] of map) {
+        if (o.IN && o.OUT) maxPair = Math.max(maxPair, idx);
+      }
+      if (maxPair < 20) return 0;
+      for (let i = 1; i <= maxPair; i++) {
+        const o = map.get(i);
+        if (!o || !o.IN || !o.OUT) return 0; // ต้องครบคู่ต่อเนื่อง
+      }
+      return maxPair;
+    }
+
+    // =========================
+    // IndexedDB (Dexie + Native)
+    // =========================
+    async function initDB() {
+      const hasDexie = typeof window.Dexie !== "undefined";
+      if (hasDexie) {
+        try {
+          const db = new Dexie("SelfieTimeLoggerMintLight");
+          db.version(1).stores({ photos: "++id, tag, kind, idx, createdAt, downloaded" });
+          db.version(2).stores({ photos: "++id, tag, kind, idx, createdAt, downloaded, downloadedAt" })
+            .upgrade(async tx => {
+              const table = tx.table("photos");
+              await table.toCollection().modify(p => {
+                if (!("downloadedAt" in p)) p.downloadedAt = null;
+                if (!("editedAt" in p)) p.editedAt = null;
+                if ((!p.kind || !p.idx) && p.tag) {
+                  const q = parseTag(p.tag);
+                  if (q) { p.kind = q.kind; p.idx = q.idx; }
+                }
+              });
+            });
+          db.version(3).stores({ photos: "++id, tag, kind, idx, createdAt, downloaded, downloadedAt, editedAt" })
+            .upgrade(async tx => {
+              const table = tx.table("photos");
+              await table.toCollection().modify(p => {
+                if (!("editedAt" in p)) p.editedAt = null;
+              });
+            });
+
+          await db.open();
+          state.dbType = "Dexie";
+          state.db = db;
+          log("DB: Dexie");
+          return;
+        } catch (e) {
+          console.warn("Dexie open failed, fallback to native:", e);
+        }
+      }
+      state.dbType = "Native";
+      state.db = await openNativeDB();
+      log("DB: Native fallback");
+    }
+
+    function openNativeDB() {
+      return new Promise((resolve, reject) => {
+        // bump version -> ให้ onupgradeneeded วิ่งเพื่อสร้าง index ที่อาจหาย
+        const req = indexedDB.open("SelfieTimeLoggerMintLight_Native", 3);
+
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          let store;
+
+          if (!db.objectStoreNames.contains("photos")) {
+            store = db.createObjectStore("photos", { keyPath: "id", autoIncrement: true });
+          } else {
+            store = req.transaction.objectStore("photos");
+          }
+
+          // ensure indexes exist (กันกรณี DB เก่าไม่มี index แล้ว store.index("createdAt") พัง)
+          if (store && store.indexNames) {
+            if (!store.indexNames.contains("createdAt")) store.createIndex("createdAt", "createdAt", { unique: false });
+            if (!store.indexNames.contains("downloaded")) store.createIndex("downloaded", "downloaded", { unique: false });
+            if (!store.indexNames.contains("tag")) store.createIndex("tag", "tag", { unique: false });
+          }
+        };
+
+        req.onsuccess = () => {
+          const db = req.result;
+
+          const api = {
+            async addPhoto(obj) { return txWrap(db, "photos", "readwrite", store => store.add(obj)); },
+            async updatePhoto(id, changes) {
+              return txWrap(db, "photos", "readwrite", async store => {
+                const existing = await reqWrap(store.get(id));
+                if (!existing) return null;
+                const merged = { ...existing, ...changes };
+                await reqWrap(store.put(merged));
+                return merged;
+              });
+            },
+            async deletePhoto(id) { return txWrap(db, "photos", "readwrite", store => store.delete(id)); },
+            async clearAll() { return txWrap(db, "photos", "readwrite", store => store.clear()); },
+            async getAll() {
+              return txWrap(db, "photos", "readonly", async store => {
+                // safe: if index missing -> fallback getAll + sort
+                if (store.indexNames && store.indexNames.contains("createdAt")) {
+                  const idx = store.index("createdAt");
+                  return await reqWrap(idx.getAll());
+                } else {
+                  const all = await reqWrap(store.getAll());
+                  all.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                  return all;
+                }
+              });
+            }
+          };
+          resolve(api);
+        };
+
+        req.onerror = () => reject(req.error);
+      });
+
+      function txWrap(db, storeName, mode, fn) {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(storeName, mode);
+          const store = tx.objectStore(storeName);
+          Promise.resolve(fn(store)).then(res => {
+            tx.oncomplete = () => resolve(res);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+          }).catch(reject);
+        });
+      }
+      function reqWrap(req) {
+        return new Promise((resolve, reject) => {
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+    }
+
+    async function dbAddPhoto(photo) {
+      if (state.dbType === "Dexie") return state.db.photos.add(photo);
+      return state.db.addPhoto(photo);
+    }
+    async function dbUpdatePhoto(id, changes) {
+      if (state.dbType === "Dexie") return state.db.photos.update(id, changes);
+      return state.db.updatePhoto(id, changes);
+    }
+    async function dbDeletePhoto(id) {
+      if (state.dbType === "Dexie") return state.db.photos.delete(id);
+      return state.db.deletePhoto(id);
+    }
+    async function dbClearAll() {
+      if (state.dbType === "Dexie") return state.db.photos.clear();
+      return state.db.clearAll();
+    }
+    async function dbGetAll() {
+      if (state.dbType === "Dexie") return state.db.photos.orderBy("createdAt").toArray();
+      return state.db.getAll();
+    }
+
+    // =========================
+    // Image utils
+    // =========================
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+    function fitWithin(w, h, maxSide) {
+      const max = Math.max(w, h);
+      if (max <= maxSide) return { w, h };
+      const scale = maxSide / max;
+      return { w: Math.round(w * scale), h: Math.round(h * scale) };
+    }
+    function canvasToJpegBlob(canvas, quality = 0.92) {
+      return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
+    }
+    async function imageFileToCleanJpegBlob(file, targetMax = 1600) {
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await loadImage(url);
+        const { w, h } = fitWithin(img.naturalWidth, img.naturalHeight, targetMax);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d", { alpha: false });
+        ctx.drawImage(img, 0, 0, w, h);
+        const blob = await canvasToJpegBlob(canvas, 0.92);
+        return { blob, width: w, height: h, mime: "image/jpeg" };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    function getThumbUrl(photo) {
+      if (state.thumbUrl.has(photo.id)) return state.thumbUrl.get(photo.id);
+      const u = URL.createObjectURL(photo.blob);
+      state.thumbUrl.set(photo.id, u);
+      return u;
+    }
+    function revokeThumbUrl(id) {
+      const u = state.thumbUrl.get(id);
+      if (u) {
+        URL.revokeObjectURL(u);
+        state.thumbUrl.delete(id);
+      }
+    }
+    function revokeAllThumbs() {
+      for (const u of state.thumbUrl.values()) URL.revokeObjectURL(u);
+      state.thumbUrl.clear();
+    }
+
+    // =========================
+    // Add/Replace photo
+    // =========================
+    async function addPhotoFromBlob(blob, meta = {}) {
+      if (state.busy.saving) return;
+      state.busy.saving = true;
+
+      const next = computeNextSlot(state.photos);
+      const { tag, kind, idx } = next;
+
+      const createdAt = now();
+      const record = {
+        tag, kind, idx,
+        createdAt,
+        downloaded: 0,
+        downloadedAt: null,
+        editedAt: null,
+        mime: meta.mime || blob.type || "image/jpeg",
+        width: meta.width || null,
+        height: meta.height || null,
+        size: blob.size,
+        blob
+      };
+
+      setSaveState(`<span class="spin"></span> บันทึก…`, "wait");
+      try {
+        const id = await dbAddPhoto(record);
+        record.id = id;
+
+        state.photos.push(record);
+        state.photos.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+        setSaveState("บันทึกแล้ว ✅", "ok");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 900);
+
+        heavyRender("addPhoto");
+        updateCamHUD();
+        showCamToast(`บันทึกแล้ว: ${tag}`);
+      } catch (e) {
+        setSaveState("บันทึกล้มเหลว", "err");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 1200);
+        log("Save error:", e && (e.message || e.name) ? (e.message || e.name) : e);
+      } finally {
+        state.busy.saving = false;
+      }
+    }
+
+    async function replacePhotoBlob(targetId, blob, meta = {}) {
+      const p = state.photos.find(x => x.id === targetId);
+      if (!p) return;
+
+      revokeThumbUrl(targetId);
+
+      const editedAt = now();
+      const changes = {
+        blob,
+        mime: meta.mime || blob.type || "image/jpeg",
+        width: meta.width || p.width || null,
+        height: meta.height || p.height || null,
+        size: blob.size,
+        editedAt
+      };
+
+      setSaveState(`<span class="spin"></span> แทนที่รูป…`, "wait");
+      try {
+        await dbUpdatePhoto(targetId, changes);
+        Object.assign(p, changes);
+
+        setSaveState("แทนที่แล้ว ✅", "ok");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 900);
+
+        heavyRender("replacePhoto");
+        showCamToast(`แทนที่แล้ว: ${p.tag}`);
+      } catch (e) {
+        setSaveState("แทนที่ล้มเหลว", "err");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 1200);
+        log("Replace error:", e && (e.message || e.name) ? (e.message || e.name) : e);
+      }
+    }
+
+    async function handleFilesAdd(files) {
+      if (!files || !files.length) return;
+      setSaveState(`<span class="spin"></span> แปลงรูป…`, "wait");
+      for (const file of files) {
+        try {
+          const clean = await imageFileToCleanJpegBlob(file, 1600);
+          await addPhotoFromBlob(clean.blob, clean);
+        } catch (e) {
+          log("Upload error:", e && (e.message || e.name) ? (e.message || e.name) : e);
+          setSaveState("บันทึกล้มเหลว", "err");
+          setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 1200);
+        }
+      }
+      heavyRender("addFiles");
+    }
+
+    async function handleFileReplace(file) {
+      if (!file || !state.replace.active || !state.replace.targetId) return;
+      setSaveState(`<span class="spin"></span> แปลงรูป…`, "wait");
+      try {
+        const clean = await imageFileToCleanJpegBlob(file, 1600);
+        await replacePhotoBlob(state.replace.targetId, clean.blob, clean);
+      } catch (e) {
+        log("Replace upload error:", e && (e.message || e.name) ? (e.message || e.name) : e);
+        setSaveState("แทนที่ล้มเหลว", "err");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 1200);
+      }
+    }
+
+    // =========================
+    // Timer 9:10 lock
+    // =========================
+    const TIMER_910_MS = (9 * 60 * 60 + 10 * 60) * 1000;
+
+    function loadTimer910() {
+      const t = loadJSON(LS.timer910, null);
+      if (t && typeof t === "object") {
+        state.timer910 = {
+          running: !!t.running,
+          locked: !!t.locked,
+          startAt: t.startAt || null,
+          targetAt: t.targetAt || null
+        };
+      }
+    }
+    function saveTimer910() { saveJSON(LS.timer910, state.timer910); }
+
+    function startTimer910() {
+      const startAt = now();
+      const targetAt = startAt + TIMER_910_MS;
+      state.timer910 = { running: true, locked: true, startAt, targetAt };
+      saveTimer910();
+      log("Timer start", fmtDT(startAt), "->", fmtDT(targetAt));
+    }
+
+    function resetTimer910ToReady() {
+      state.timer910 = { running: false, locked: false, startAt: null, targetAt: null };
+      saveTimer910();
+
+      state.alarm = { dueAt: null, nextTag: null, firedDueAt: null };
+      saveJSON(LS.alarm, state.alarm);
+      stopAlarmTimeout();
+      hideToast();
+
+      // cancel LINE schedule when reset
+      void lineCancelSchedule("timer reset");
+
+      log("Timer reset -> READY");
+    }
+
+    async function onStartButtonClick() {
+      if (!state.timer910.running) {
+        startTimer910();
+        heavyRender("timerStart");
+        return;
+      }
+
+      // running: reset allowed only when UNLOCKED
+      if (state.timer910.locked) return;
+
+      resetTimer910ToReady();
+      heavyRender("timerReset");
+    }
+
+    // =========================
+    // Counts / sorting
+    // =========================
+    function computeCounts() {
+      const total = state.photos.length;
+      const downloaded = state.photos.filter(p => p.downloaded === 1).length;
+      const pending = total - downloaded;
+      return { total, downloaded, pending };
+    }
+    function sortSlot(a, b) {
+      const ai = a.idx || 0, bi = b.idx || 0;
+      if (ai !== bi) return ai - bi;
+      const ak = (String(a.kind).toUpperCase() === "IN") ? 0 : 1;
+      const bk = (String(b.kind).toUpperCase() === "IN") ? 0 : 1;
+      return ak - bk;
+    }
+    function getSortedPending() {
+      const pending = state.photos.filter(p => p.downloaded === 0).map(ensureKindIdx);
+      pending.sort(sortSlot);
+      return pending;
+    }
+    function getLastDownloadedFirstTime() {
+      const downloaded = state.photos.filter(p => p.downloaded === 1 && p.downloadedAt);
+      if (!downloaded.length) return null;
+      downloaded.sort((a, b) => (a.downloadedAt || 0) - (b.downloadedAt || 0));
+      return downloaded[downloaded.length - 1] || null;
+    }
+
+    // =========================
+    // Schedule math (Exact fit)
+    // =========================
+    function minGapMinutes(kind) { return (kind === "IN") ? 3 : 4; }
+    function maxGapMinutes(kind) { return (kind === "IN") ? 25 : 30; }
+
+    function buildContiguousPendingChain(nextExpected, pendingByTag, limit = 200) {
+      const chain = [];
+      let tag = nextExpected;
+      let missingTag = null;
+      for (let i = 0; i < limit; i++) {
+        const p = pendingByTag.get(tag);
+        if (!p) {
+          missingTag = tag;
+          break;
+        }
+        chain.push(p);
+        const nxt = nextTagInSequence(tag);
+        if (!nxt) { break; }
+        tag = nxt;
+      }
+      return { chain, missingTag };
+    }
+
+    function solveExactAB(totalMin, nIn, nOut) {
+      if (nIn === 0 && nOut === 0) return { ok: false, a: null, b: null };
+
+      if (nOut === 0) {
+        const a = totalMin / Math.max(1, nIn);
+        const ok = (a >= 3 && a <= 25);
+        return { ok, a: Math.max(3, Math.min(25, a)), b: null };
+      }
+      if (nIn === 0) {
+        const b = totalMin / Math.max(1, nOut);
+        const ok = (b >= 4 && b <= 30);
+        return { ok, a: null, b: Math.max(4, Math.min(30, b)) };
+      }
+
+      const mean = totalMin / (nIn + nOut);
+      let best = { ok: false, a: null, b: null, score: 1e18 };
+
+      for (let a = 3; a <= 25.0001; a += 0.01) {
+        const b = (totalMin - a * nIn) / nOut;
+        if (b < 4 || b > 30) continue;
+        if (!(b > a + 0.001)) continue;
+        const score = Math.abs(a - mean) + Math.abs(b - mean) + 0.08 * Math.abs(b - a);
+        if (score < best.score) {
+          best = { ok: true, a, b, score };
+        }
+      }
+
+      if (best.ok) return best;
+      const a0 = Math.max(3, Math.min(25, mean - 1));
+      const b0 = Math.max(4, Math.min(30, mean + 1));
+      const bAdj = (b0 <= a0) ? Math.min(30, a0 + 0.25) : b0;
+      return { ok: false, a: a0, b: bAdj };
+    }
+
+    function distributeMsToMatchTotal(gapsMs, kinds, totalMs) {
+      let sum = gapsMs.reduce((s, x) => s + x, 0);
+      let diff = totalMs - sum;
+      if (diff === 0) return gapsMs;
+
+      let safety = 200000;
+      while (diff !== 0 && safety-- > 0) {
+        let moved = false;
+        for (let i = gapsMs.length - 1; i >= 0 && diff !== 0; i--) {
+          const kind = kinds[i];
+          const minMs = Math.round(minGapMinutes(kind) * 60000);
+          const maxMs = Math.round(maxGapMinutes(kind) * 60000);
+          if (diff > 0) {
+            if (gapsMs[i] < maxMs) {
+              gapsMs[i] += 1; diff -= 1; moved = true;
+            }
+          } else {
+            if (gapsMs[i] > minMs) {
+              gapsMs[i] -= 1; diff += 1; moved = true;
+            }
+          }
+        }
+        if (!moved) break;
+      }
+      return gapsMs;
+    }
+
+    function computeScheduleExactFit() {
+      const sched = {
+        ok: false,
+        error: "",
+        warn: "",
+        nextTag: null,
+        nextAt: null,
+        planAtById: new Map(),
+        source: { lastDownloadedTag: null, lastDownloadedAt: null }
+      };
+
+      if (!state.timer910.running || !state.timer910.targetAt) {
+        sched.error = "เริ่มนับเวลาก่อน";
+        sched.nextTag = peekNextTag();
+        return sched;
+      }
+
+      const pending = state.photos.filter(p => p.downloaded === 0).map(ensureKindIdx);
+      const pendingByTag = new Map(pending.map(p => [p.tag, p]));
+
+      const last = getLastDownloadedFirstTime();
+      let nextExpected = last ? nextTagInSequence(last.tag) : "IN-1";
+      sched.source.lastDownloadedTag = last ? last.tag : null;
+      sched.source.lastDownloadedAt = last ? last.downloadedAt : null;
+
+      const { chain, missingTag } = buildContiguousPendingChain(nextExpected, pendingByTag, 200);
+      sched.nextTag = chain[0]?.tag || nextExpected || "-";
+
+      if (chain.length === 0) {
+        sched.error = `ขาดรูป ${nextExpected}`;
+        return sched;
+      }
+
+      const targetAt = state.timer910.targetAt;
+      let baseTime = last ? last.downloadedAt : now();
+      baseTime = Math.max(baseTime, state.timer910.startAt || 0);
+
+      let totalMs = targetAt - baseTime;
+      if (totalMs <= 0) {
+        sched.error = "เลยเวลาเป้าหมายแล้ว";
+        sched.nextAt = now();
+        return sched;
+      }
+
+      let kinds = [];
+
+      if (last) {
+        const lastKind = (parseTag(last.tag)?.kind) || "IN";
+        kinds.push(lastKind);
+        for (let i = 1; i < chain.length; i++) {
+          kinds.push(String(chain[i - 1].kind).toUpperCase());
+        }
+      } else {
+        if (chain.length === 1) {
+          sched.planAtById.set(chain[0].id, targetAt);
+          sched.nextAt = targetAt;
+          sched.ok = true;
+          return sched;
+        }
+        for (let i = 0; i < chain.length - 1; i++) {
+          kinds.push(String(chain[i].kind).toUpperCase());
+        }
+      }
+
+      let minSum = 0, maxSum = 0;
+      for (const k of kinds) {
+        minSum += minGapMinutes(k) * 60000;
+        maxSum += maxGapMinutes(k) * 60000;
+      }
+
+      if (totalMs > maxSum + 1) {
+        sched.error = missingTag ? `ขาดรูป ${missingTag}` : `รูปไม่พอถึงเป้าหมาย`;
+        const gapsMs = kinds.map(k => Math.round(maxGapMinutes(k) * 60000));
+        let t = baseTime;
+        if (last) {
+          for (let i = 0; i < chain.length; i++) {
+            t += gapsMs[i];
+            sched.planAtById.set(chain[i].id, t);
+          }
+          sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+        } else {
+          sched.planAtById.set(chain[0].id, baseTime);
+          for (let i = 1; i < chain.length; i++) {
+            t += gapsMs[i - 1];
+            sched.planAtById.set(chain[i].id, t);
+          }
+          sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+        }
+        return sched;
+      }
+
+      if (totalMs < minSum - 1) {
+        sched.error = `เวลาน้อยเกินสำหรับจำนวนรูปในลำดับ`;
+        const gapsMs = kinds.map(k => Math.round(minGapMinutes(k) * 60000));
+        let t = baseTime;
+        if (last) {
+          for (let i = 0; i < chain.length; i++) {
+            t += gapsMs[i];
+            sched.planAtById.set(chain[i].id, t);
+          }
+          sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+        } else {
+          sched.planAtById.set(chain[0].id, baseTime);
+          for (let i = 1; i < chain.length; i++) {
+            t += gapsMs[i - 1];
+            sched.planAtById.set(chain[i].id, t);
+          }
+          sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+        }
+        return sched;
+      }
+
+      let nIn = 0, nOut = 0;
+      for (const k of kinds) { if (k === "IN") nIn++; else nOut++; }
+      const totalMin = totalMs / 60000;
+
+      const { ok: abOk, a, b } = solveExactAB(totalMin, nIn, nOut);
+
+      let gapsMs = new Array(kinds.length).fill(0).map((_, i) => {
+        const k = kinds[i];
+        const mins = (k === "IN") ? (a ?? 10) : (b ?? 12);
+        const clamped = Math.max(minGapMinutes(k), Math.min(maxGapMinutes(k), mins));
+        return Math.round(clamped * 60000);
+      });
+
+      gapsMs = distributeMsToMatchTotal(gapsMs, kinds, Math.round(totalMs));
+
+      let t = baseTime;
+      if (last) {
+        for (let i = 0; i < chain.length; i++) {
+          t += gapsMs[i];
+          sched.planAtById.set(chain[i].id, t);
+        }
+        sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+      } else {
+        sched.planAtById.set(chain[0].id, baseTime);
+        for (let i = 1; i < chain.length; i++) {
+          t += gapsMs[i - 1];
+          sched.planAtById.set(chain[i].id, t);
+        }
+        sched.nextAt = sched.planAtById.get(chain[0].id) || null;
+      }
+
+      if (!abOk) {
+        sched.warn = "เฉลี่ยแบบ IN<OUT เป๊ะไม่ได้ (ใช้ค่าใกล้เคียง)";
+      }
+      sched.ok = !sched.error;
+      return sched;
+    }
+
+    // =========================
+    // In-app alarm
+    // =========================
+    function loadAlarmState() {
+      const a = loadJSON(LS.alarm, null);
+      if (a && typeof a === "object") {
+        state.alarm = {
+          dueAt: a.dueAt || null,
+          nextTag: a.nextTag || null,
+          firedDueAt: a.firedDueAt || null
+        };
+      }
+    }
+    function saveAlarmState() { saveJSON(LS.alarm, state.alarm); }
+
+    function stopAlarmTimeout() {
+      if (state.alarmTimeout) {
+        clearTimeout(state.alarmTimeout);
+        state.alarmTimeout = null;
+      }
+    }
+
+    function tryNotify(body) {
+      if (typeof Notification === "undefined") return;
+      if (Notification.permission !== "granted") return;
+      try { new Notification("Selfie Time Logger", { body }); } catch (_) { }
+    }
+
+    function beepOnce(duration = 0.14, freq = 880) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = freq;
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.value = 0.08;
+        o.start();
+        setTimeout(() => { o.stop(); ctx.close(); }, duration * 1000);
+      } catch (_) { }
+    }
+    function vibratePattern() {
+      try { if (navigator.vibrate) navigator.vibrate([120, 70, 120]); } catch (_) { }
+    }
+    function beepSoft() {
+      vibratePattern();
+      beepOnce(0.12, 880);
+      setTimeout(() => beepOnce(0.12, 990), 170);
+    }
+
+    function showToast(text, sub, autoHideMs = 6500) {
+      $("toastText").textContent = text;
+      $("toastSub").textContent = sub || "";
+      $("toastWrap").classList.add("show");
+      if (state.toastTimer) clearTimeout(state.toastTimer);
+      state.toastTimer = setTimeout(() => hideToast(), autoHideMs);
+    }
+    function hideToast() {
+      $("toastWrap").classList.remove("show");
+      if (state.toastTimer) {
+        clearTimeout(state.toastTimer);
+        state.toastTimer = null;
+      }
+    }
+
+    function scheduleNextAlarmFromSchedule() {
+      stopAlarmTimeout();
+      const last = getLastDownloadedFirstTime();
+      if (!last) {
+        state.alarm = { dueAt: null, nextTag: null, firedDueAt: null };
+        saveAlarmState();
+        return;
+      }
+
+      const s = state.schedule;
+      if (!s || !s.nextAt || !s.nextTag || s.error) {
+        state.alarm = { dueAt: null, nextTag: null, firedDueAt: null };
+        saveAlarmState();
+        return;
+      }
+
+      const dueAt = s.nextAt;
+      state.alarm.dueAt = dueAt;
+      state.alarm.nextTag = s.nextTag;
+      if (state.alarm.firedDueAt && state.alarm.firedDueAt !== dueAt) {
+        state.alarm.firedDueAt = null;
+      }
+      saveAlarmState();
+
+      const delay = Math.max(0, dueAt - now());
+      state.alarmTimeout = setTimeout(() => { fireAlarmIfNeeded(true); }, delay + 80);
+
+      fireAlarmIfNeeded(false);
+    }
+
+    function fireAlarmIfNeeded(fromTimeout) {
+      const dueAt = state.alarm.dueAt;
+      if (!dueAt) return;
+
+      const isPast = (dueAt - now()) <= 0;
+      if (!isPast) return;
+
+      if (state.alarm.firedDueAt === dueAt) return;
+      if (!fromTimeout && !state.ui.autoWake) return;
+
+      state.alarm.firedDueAt = dueAt;
+      saveAlarmState();
+
+      const nextTag = state.alarm.nextTag || "-";
+      const msg = nextTag.startsWith("OUT-") ? "ครบเวลา Check Out ได้แล้ว" : "ครบเวลา Check In ได้แล้ว";
+
+      showToast(msg, `Next: ${nextTag}`);
+      tryNotify(`${msg} • Next: ${nextTag}`);
+      beepSoft();
+      log("ALARM FIRED:", msg, "dueAt=", fmtDT(dueAt));
+    }
+
+    async function requestNotificationPermission() {
+      if (typeof Notification === "undefined") {
+        alert("อุปกรณ์/เบราว์เซอร์นี้ไม่รองรับ Notification");
+        return;
+      }
+      try {
+        const p = await Notification.requestPermission();
+        log("Notification permission:", p);
+        showToast("Permission", `Notification: ${p}`, 2500);
+      } catch (e) {
+        log("Permission request error:", e);
+      }
+    }
+
+    // =========================
+    // Download & mark downloaded
+    // =========================
+    async function maybeUnlockAfterDownload(photo) {
+      if (!state.timer910.running) return;
+      if (!state.timer910.locked) return;
+
+      const maxPair = getUnlockMaxPairIfEligible();
+      if (!maxPair) return;
+
+      if (photo.tag === `OUT-${maxPair}`) {
+        state.timer910.locked = false;
+        saveTimer910();
+        showToast("ปลดล็อคแล้ว ✅", "กดปุ่ม “สิ้นสุด …” เพื่อรีเซ็ตเวลาได้", 5200);
+        log("UNLOCKED by final OUT:", photo.tag, "maxPair=", maxPair);
+      }
+    }
+
+    async function downloadPhoto(photo) {
+      const filename = `${photo.tag}.jpg`;
+
+      const url = URL.createObjectURL(photo.blob);
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+
+      const wasFirstTime = (photo.downloaded !== 1);
+
+      if (wasFirstTime) {
+        const t = now();
+        await dbUpdatePhoto(photo.id, { downloaded: 1, downloadedAt: t });
+        photo.downloaded = 1;
+        photo.downloadedAt = t;
+        log("Marked downloaded (first time):", photo.tag);
+
+        // unlock rule check
+        await maybeUnlockAfterDownload(photo);
+
+        // Re-render (updates schedule)
+        heavyRender("downloadFirstTime");
+
+        // LINE: send start-day only when IN-1 downloaded first time of day
+        if (photo.tag === "IN-1") {
+          void lineNotifyStartDayIfNeeded();
+        }
+
+        // Schedule next via Worker (and overwrite if changed)
+        void lineScheduleNextFromCurrentSchedule("first-time download");
+      } else {
+        log("Downloaded again:", photo.tag);
+      }
+    }
+
+    async function downloadNextFromHeader() {
+      const btn = $("downloadNextBtn");
+      const pending = getSortedPending();
+      if (!pending.length) {
+        showToast("ยังไม่มี Pending", "ถ่าย/อัปโหลดรูปก่อน", 2500);
+        return;
+      }
+
+      let chosen = null;
+      const s = state.schedule;
+      if (state.timer910.running && s && !s.error && s.nextTag) {
+        chosen = pending.find(p => p.tag === s.nextTag) || null;
+      }
+      if (!chosen) chosen = pending[0];
+
+      btn.disabled = true;
+      try {
+        await downloadPhoto(chosen);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deletePhoto(id, tag) {
+      await dbDeletePhoto(id);
+      revokeThumbUrl(id);
+      state.photos = state.photos.filter(p => p.id !== id);
+      log("Deleted", tag, "id=", id);
+      heavyRender("deletePhoto");
+    }
+
+    function openDrawer() {
+      $("drawerBackdrop").classList.add("show");
+      $("drawer").classList.add("show");
+    }
+    function closeDrawer() {
+      $("drawerBackdrop").classList.remove("show");
+      $("drawer").classList.remove("show");
+    }
+
+    // =========================
+    // Delete all (confirm x2)
+    // =========================
+    async function deleteAll() {
+      const ok1 = confirm("ต้องการลบรูปทั้งหมดใช่ไหม?\n(ลบจริงจากเครื่อง/IndexedDB)");
+      if (!ok1) return;
+      const ok2 = confirm("ยืนยันอีกครั้ง: ลบรูปทั้งหมด + รีเซ็ตเวลา\nการกระทำนี้ย้อนกลับไม่ได้");
+      if (!ok2) return;
+
+      setSaveState(`<span class="spin"></span> ลบ…`, "wait");
+      try {
+        await dbClearAll();
+        revokeAllThumbs();
+        state.photos = [];
+        resetTimer910ToReady(); // includes LINE cancel
+        setSaveState("ลบแล้ว ✅", "ok");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 900);
+      } catch (e) {
+        setSaveState("ลบล้มเหลว", "err");
+        setTimeout(() => setSaveState("พร้อมใช้งาน", "wait"), 1200);
+      }
+      heavyRender("deleteAll");
+    }
+
+    async function refresh() {
+      const all = await dbGetAll();
+      all.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      for (const p of all) ensureKindIdx(p);
+      state.photos = all;
+      heavyRender("refresh");
+    }
+
+    // =========================
+    // UI state
+    // =========================
+    function loadUIState() {
+      const u = loadJSON(LS.ui, null);
+      if (u && typeof u === "object") {
+        state.ui.logEnabled = !!u.logEnabled;
+        state.ui.autoWake = (u.autoWake !== false);
+        state.ui.mirrorPref = (u.mirrorPref !== false);
+      }
+      $("logToggle").checked = state.ui.logEnabled;
+      $("autoWakeToggle").checked = state.ui.autoWake;
+      $("mirrorHintToggle").checked = state.ui.mirrorPref;
+      $("logPanel").style.display = state.ui.logEnabled ? "" : "none";
+    }
+    function saveUIState() {
+      saveJSON(LS.ui, {
+        logEnabled: state.ui.logEnabled,
+        autoWake: state.ui.autoWake,
+        mirrorPref: state.ui.mirrorPref
+      });
+    }
+
+    // =========================
+    // Camera
+    // =========================
+    async function openCamera(isReplace = false) {
+      $("camModalBackdrop").classList.add("show");
+      $("camModeBadge").textContent = "CAM";
+      $("camModeBadge").className = "badge ok";
+
+      if (isReplace && state.replace.active && state.replace.targetTag) {
+        $("replaceBadge").style.display = "";
+        $("replaceBadge").textContent = `REPLACE ${state.replace.targetTag}`;
+      } else {
+        $("replaceBadge").style.display = "none";
+        $("replaceBadge").textContent = "REPLACE -";
+      }
+
+      updateCamHUD();
+      await startCameraStream();
+    }
+
+    function closeCamera() {
+      stopCameraStream();
+      $("camModalBackdrop").classList.remove("show");
+      hideCamToast();
+
+      state.replace.active = false;
+      state.replace.targetId = null;
+      state.replace.targetTag = null;
+      $("replaceBadge").style.display = "none";
+    }
+
+    async function startCameraStream() {
+      stopCameraStream();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        $("camModeBadge").textContent = "NO CAMERA";
+        $("camModeBadge").className = "badge err";
+        log("Camera API not supported");
+        return;
+      }
+
+      const facing = state.cam.facing;
+      const useMirror = (facing === "user") && state.ui.mirrorPref;
+
+      $("camFacingPill").textContent = `facing: ${facing}`;
+      $("camMirrorPill").textContent = `mirror: ${useMirror ? "ON" : "OFF"}`;
+
+      try {
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        state.cam.stream = stream;
+
+        const video = $("camVideo");
+        video.srcObject = stream;
+        video.classList.toggle("mirror", useMirror);
+
+        await video.play();
+      } catch (e) {
+        $("camModeBadge").textContent = "CAM ERROR";
+        $("camModeBadge").className = "badge err";
+        log("Camera error:", e && (e.name || e.message) ? (e.name || e.message) : e);
+      }
+    }
+
+    function stopCameraStream() {
+      const s = state.cam.stream;
+      if (s) s.getTracks().forEach(t => t.stop());
+      state.cam.stream = null;
+      $("camVideo").srcObject = null;
+    }
+
+    async function switchCamera() {
+      state.cam.facing = (state.cam.facing === "user") ? "environment" : "user";
+      await startCameraStream();
+    }
+
+    function camFlash() {
+      const el = $("camFlash");
+      el.classList.add("on");
+      setTimeout(() => el.classList.remove("on"), 140);
+    }
+    function showCamToast(text) {
+      $("camToastInner").textContent = text;
+      $("camToast").classList.add("show");
+      setTimeout(() => hideCamToast(), 900);
+    }
+    function hideCamToast() {
+      $("camToast").classList.remove("show");
+    }
+
+    function updateCamHUD() {
+      const { total, downloaded, pending } = computeCounts();
+      $("camCountPill").textContent = `📸 Total: ${total} • Pending: ${pending} • DL: ${downloaded}`;
+      const next = state.replace.active ? state.replace.targetTag : peekNextTag();
+      $("camNextPill").textContent = `Next: ${next}`;
+    }
+
+    async function captureFromCamera() {
+      const video = $("camVideo");
+      if (!video || !video.videoWidth) {
+        showCamToast("กล้องยังไม่พร้อม");
+        return;
+      }
+
+      camFlash();
+      if (navigator.vibrate) navigator.vibrate(12);
+
+      const facing = state.cam.facing;
+      const mirror = (facing === "user") && state.ui.mirrorPref;
+
+      const outAR = 3 / 4;
+      const srcW = video.videoWidth;
+      const srcH = video.videoHeight;
+      const srcAR = srcW / srcH;
+
+      let cropW, cropH, sx, sy;
+      if (srcAR > outAR) {
+        cropH = srcH;
+        cropW = cropH * outAR;
+        sx = (srcW - cropW) / 2;
+        sy = 0;
+      } else {
+        cropW = srcW;
+        cropH = cropW / outAR;
+        sx = 0;
+        sy = (srcH - cropH) / 2;
+      }
+
+      const maxH = 1600;
+      let outH = Math.min(maxH, Math.round(cropH));
+      let outW = Math.round(outH * outAR);
+      if (cropH < maxH) {
+        outH = Math.round(cropH);
+        outW = Math.round(cropW);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = outW; canvas.height = outH;
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      if (mirror) {
+        ctx.save();
+        ctx.translate(outW, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
+        ctx.restore();
+      } else {
+        ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
+      }
+
+      const blob = await canvasToJpegBlob(canvas, 0.92);
+
+      if (state.replace.active && state.replace.targetId) {
+        await replacePhotoBlob(state.replace.targetId, blob, { width: outW, height: outH, mime: "image/jpeg" });
+      } else {
+        await addPhotoFromBlob(blob, { width: outW, height: outH, mime: "image/jpeg" });
+      }
+
+      updateCamHUD();
+    }
+
+    // =========================
+    // Render
+    // =========================
+    function renderTopCounts() {
+      const { downloaded } = computeCounts();
+      $("dlCountTop").textContent = downloaded;
+    }
+
+    function renderTimerPanel() {
+      const b = $("timerLockBadge");
+      if (state.timer910.running) {
+        if (state.timer910.locked) {
+          b.className = "badge err";
+          b.textContent = "LOCKED";
+        } else {
+          b.className = "badge ok";
+          b.textContent = "UNLOCKED";
+        }
+      } else {
+        b.className = "badge ok";
+        b.textContent = "READY";
+      }
+
+      $("timerMeta").textContent =
+        `startAt: ${fmtDT(state.timer910.startAt)} • targetAt: ${fmtDT(state.timer910.targetAt)}`;
+
+      const startBtn = $("start910Btn");
+      if (!state.timer910.running) {
+        startBtn.textContent = "⏱️ เริ่มนับเวลา";
+        startBtn.disabled = false;
+      } else {
+        startBtn.textContent = `สิ้นสุด ${fmtTimeOnly(state.timer910.targetAt)}`;
+        // รีเซ็ตได้เฉพาะตอน UNLOCKED
+        startBtn.disabled = !!state.timer910.locked;
+      }
+
+      if (state.timer910.running && state.timer910.targetAt) {
+        $("timerLeftPill").textContent = `เหลือ: ${fmtHMS(state.timer910.targetAt - now())}`;
+      } else {
+        $("timerLeftPill").textContent = "เหลือ: -";
+      }
+    }
+
+    function renderProgressBar() {
+      // FIX: Progress = downloaded (ไม่ใช่ total)
+      const { downloaded } = computeCounts();
+      const prog = Math.min(40, downloaded);
+      $("progressBar").style.width = `${(prog / 40) * 100}%`;
+      $("goalBadge").style.display = (downloaded >= 40) ? "" : "none";
+    }
+
+    function renderHeaderStatus() {
+      const s = state.schedule;
+
+      const nextText = s.nextTag || peekNextTag() || "-";
+      $("headerNextText").textContent = nextText;
+
+      const pending = getSortedPending();
+      if (!pending.length) {
+        $("downloadNextBtn").textContent = "⬇ โหลดภาพถัดไป";
+        $("downloadNextBtn").disabled = true;
+      } else {
+        let labelTag = null;
+        if (state.timer910.running && s && !s.error && s.nextTag) labelTag = s.nextTag;
+        else labelTag = pending[0].tag;
+        $("downloadNextBtn").textContent = labelTag ? `⬇ โหลด ${labelTag}` : "⬇ โหลดภาพถัดไป";
+        $("downloadNextBtn").disabled = false;
+      }
+
+      if (!state.timer910.running) {
+        $("headerWhenText").textContent = "-";
+        $("headerCountdownText").textContent = "-";
+        $("headerWarnLine").style.display = "";
+        $("headerWarnLine").textContent = "⚠ เริ่มนับเวลาก่อน";
+        return;
+      }
+
+      if (s.nextAt) {
+        const left = s.nextAt - now();
+        $("headerWhenText").textContent = (left <= 0) ? "ตอนนี้" : fmtTimeOnly(s.nextAt);
+        $("headerCountdownText").textContent = (left <= 0) ? "ถึงเวลา" : fmtHMS(left);
+      } else {
+        $("headerWhenText").textContent = "-";
+        $("headerCountdownText").textContent = "-";
+      }
+
+      if (s.error) {
+        $("headerWarnLine").style.display = "";
+        $("headerWarnLine").textContent = `⚠ ${s.error}`;
+      } else {
+        $("headerWarnLine").style.display = "none";
+        $("headerWarnLine").textContent = "";
+      }
+    }
+
+    function renderAlarmPanel() {
+      if (state.alarm.dueAt) {
+        const left = state.alarm.dueAt - now();
+        if (left <= 0) {
+          $("alarmBadge").className = "badge err";
+          $("alarmBadge").textContent = "ครบเวลาแล้ว";
+        } else {
+          $("alarmBadge").className = "badge wait";
+          $("alarmBadge").textContent = "กำลังนับ…";
+        }
+        $("alarmLeftPill").textContent = `เหลือ: ${fmtHMS(left)}`;
+        $("alarmMeta").textContent = `next: ${state.alarm.nextTag || "-"} • dueAt: ${fmtDT(state.alarm.dueAt)}`;
+      } else {
+        $("alarmBadge").className = "badge";
+        $("alarmBadge").textContent = "ยังไม่ตั้ง";
+        $("alarmLeftPill").textContent = "เหลือ: -";
+        $("alarmMeta").textContent = "next: - • dueAt: -";
+      }
+    }
+
+    function renderLists() {
+      const pendingList = $("pendingList");
+      pendingList.innerHTML = "";
+
+      const downloadedList = $("downloadedList");
+      downloadedList.innerHTML = "";
+
+      const pending = state.photos.filter(p => p.downloaded === 0).map(ensureKindIdx);
+      const downloaded = state.photos.filter(p => p.downloaded === 1).map(ensureKindIdx);
+
+      pending.sort(sortSlot);
+      downloaded.sort(sortSlot);
+
+      $("pendingBadge").textContent = pending.length;
+      $("pendingEmpty").style.display = pending.length ? "none" : "";
+
+      $("drawerDownloadedCount").textContent = downloaded.length;
+      $("downloadedEmpty").style.display = downloaded.length ? "none" : "";
+
+      const planMap = state.schedule.planAtById || new Map();
+
+      for (const p of pending) pendingList.appendChild(renderPhotoItem(p, false, planMap));
+      for (const p of downloaded) downloadedList.appendChild(renderPhotoItem(p, true, planMap));
+
+      const { total, downloaded: dlCount, pending: pendCount } = computeCounts();
+      $("totalCount").textContent = total;
+      $("downloadedCount").textContent = dlCount;
+      $("pendingCount").textContent = pendCount;
+    }
+
+    function renderPhotoItem(photo, isDownloaded, planMap) {
+      const wrap = document.createElement("div");
+      wrap.className = "photoItem";
+
+      const img = document.createElement("img");
+      img.className = "thumb";
+      img.style.cursor = "pointer";
+      img.src = getThumbUrl(photo);
+      img.onclick = () => openImageViewer(img.src);
+      img.alt = photo.tag;
+
+      const info = document.createElement("div");
+      info.className = "info";
+
+      const metaTop = document.createElement("div");
+      metaTop.className = "metaTop";
+
+      const left = document.createElement("div");
+      left.className = "metaLine";
+
+      const tagBadge = document.createElement("span");
+      tagBadge.className = "badge ok";
+      tagBadge.textContent = photo.tag;
+
+      const statusBadge = document.createElement("span");
+      statusBadge.className = "badge " + (isDownloaded ? "ok" : "wait");
+      statusBadge.textContent = isDownloaded ? "โหลดแล้ว ✅" : "ยังไม่โหลด";
+
+      left.appendChild(tagBadge);
+      left.appendChild(statusBadge);
+
+      const time = document.createElement("div");
+      time.className = "timeText";
+      time.textContent = fmtDT(photo.createdAt);
+
+      metaTop.appendChild(left);
+      metaTop.appendChild(time);
+
+      const timeUseRow = document.createElement("div");
+      timeUseRow.className = "timeUseRow";
+
+      const reco = document.createElement("div");
+      reco.className = "recoText";
+
+      if (!isDownloaded) {
+        const t = planMap.get(photo.id);
+        if (t) {
+          const late = (t - now()) <= 0;
+          reco.classList.toggle("late", late);
+          reco.textContent = `Time use ${fmtTimeOnly(t)}${late ? " • ถึงเวลา" : ""}`;
+        } else {
+          reco.classList.add("muted");
+          reco.textContent = "Time use —";
+        }
+      } else {
+        reco.classList.add("muted");
+        reco.textContent = `Time use —`;
+      }
+
+      timeUseRow.appendChild(reco);
+
+      // Pending: Edit + small Download buttons on same line (Grouped)
+      if (!isDownloaded) {
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btnGroup";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn soft btnMini";
+        editBtn.textContent = "✏️";
+        editBtn.title = "แทนที่รูปใบนี้ (Pending เท่านั้น)";
+        editBtn.onclick = async () => {
+          state.replace.active = true;
+          state.replace.targetId = photo.id;
+          state.replace.targetTag = photo.tag;
+          await openCamera(true);
+        };
+        btnGroup.appendChild(editBtn);
+
+        // Small download button for pending (with confirmation)
+        const dlBtnPending = document.createElement("button");
+        dlBtnPending.className = "btn primary btnMini";
+        dlBtnPending.textContent = "⬇";
+        dlBtnPending.title = "Download รูปนี้";
+        dlBtnPending.onclick = async () => {
+          const ok = confirm(`ดาวน์โหลด ${photo.tag} ตอนนี้?\nหลังดาวน์โหลดแล้วจะนับเป็น Downloaded`);
+          if (!ok) return;
+          dlBtnPending.disabled = true;
+          try { await downloadPhoto(photo); }
+          finally { dlBtnPending.disabled = false; }
+        };
+        btnGroup.appendChild(dlBtnPending);
+
+        timeUseRow.appendChild(btnGroup);
+      }
+
+      // Downloaded: full actions grid with Download + Delete
+      if (isDownloaded) {
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const dlBtn = document.createElement("button");
+        dlBtn.className = "btn primary";
+        dlBtn.textContent = "⬇ Download";
+        dlBtn.onclick = async () => {
+          dlBtn.disabled = true;
+          try { await downloadPhoto(photo); }
+          finally { dlBtn.disabled = false; }
+        };
+        actions.appendChild(dlBtn);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn danger";
+        delBtn.textContent = "🗑 Delete";
+        delBtn.onclick = async () => {
+          const ok = confirm(`ลบรูป ${photo.tag} ใช่ไหม?\n(ลบจริงจากเครื่อง/IndexedDB)`);
+          if (!ok) return;
+          delBtn.disabled = true;
+          try { await deletePhoto(photo.id, photo.tag); }
+          finally { delBtn.disabled = false; }
+        };
+        actions.appendChild(delBtn);
+
+        info.appendChild(metaTop);
+        info.appendChild(timeUseRow);
+        info.appendChild(actions);
+      } else {
+        info.appendChild(metaTop);
+        info.appendChild(timeUseRow);
+      }
+
+      wrap.appendChild(img);
+      wrap.appendChild(info);
+      return wrap;
+    }
+
+    function heavyRender(reason = "") {
+      state.schedule = computeScheduleExactFit();
+
+      renderTopCounts();
+      renderProgressBar();
+      renderTimerPanel();
+      renderAlarmPanel();
+      renderLists();
+
+      scheduleNextAlarmFromSchedule();
+      fireAlarmIfNeeded(false);
+
+      renderHeaderStatus();
+
+      // NEW: ส่งอัปเดท schedule ไป Worker เมื่อ schedule เปลี่ยนจาก add/replace/delete/download ฯลฯ
+      maybeSyncLineSchedule("recalc:" + reason);
+
+      requestAnimationFrame(() => measureBars());
+    }
+
+    function lightTick() {
+      renderTimerPanel();
+      renderHeaderStatus();
+      renderAlarmPanel();
+      fireAlarmIfNeeded(false);
+    }
+
+    // =========================
+    // Bars measuring
+    // =========================
+    function measureBars() {
+      const top = $("topBar");
+      const bottom = $("stickyBar");
+      const topH = top ? top.offsetHeight : 0;
+      const stickH = bottom ? bottom.offsetHeight : 0;
+      document.documentElement.style.setProperty("--topH", `${topH}px`);
+      document.documentElement.style.setProperty("--stickH", `${stickH}px`);
+    }
+    function installResizeObservers() {
+      const ro = new ResizeObserver(() => measureBars());
+      ro.observe($("topBar"));
+      ro.observe($("stickyBar"));
+    }
+
+    // =========================
+    // Boot
+    // =========================
+    async function boot() {
+      loadUIState();
+      loadTimer910();
+      loadAlarmState();
+      loadLineCfg();
+
+      // NEW: boot cleanup — ถ้าเคย schedule ด้วยโค้ดเก่า แล้วตอนนี้เปลี่ยน code
+      // ให้ cancel ของเก่าทิ้ง เพื่อลดปัญหา “โค้ดเก่าค้าง แต่ client ไม่รู้”
+      if (state.line.enabled && state.line.lastScheduledCode) {
+        const cur = String(state.line.code || "").trim();
+        const lastScheduled = String(state.line.lastScheduledCode || "").trim();
+        if (lastScheduled && lastScheduled !== cur) {
+          void lineCancelScheduleForCode(lastScheduled, "boot cleanup (code changed)");
+          state.line.lastScheduleKey = "";
+          state.line.lastScheduledCode = "";
+          saveLineCfg();
+        }
+      }
+
+      await tryPersistStorage();
+
+      await initDB();
+      await refresh();
+
+      installResizeObservers();
+      measureBars();
+      window.addEventListener("resize", () => measureBars());
+      window.addEventListener("orientationchange", () => setTimeout(() => measureBars(), 200));
+
+      $("fileInputAdd").addEventListener("change", async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = "";
+        await handleFilesAdd(files);
+      });
+
+      $("fileInputReplace").addEventListener("change", async (e) => {
+        const file = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+        e.target.value = "";
+        await handleFileReplace(file);
+      });
+
+      // Sticky: camera/upload
+      $("openCameraStickyBtn").onclick = async () => {
+        state.replace.active = false;
+        state.replace.targetId = null;
+        state.replace.targetTag = null;
+        await openCamera(false);
+      };
+      $("uploadStickyBtn").onclick = () => $("fileInputAdd").click();
+
+      $("fallbackUploadBtn").onclick = () => {
+        if (state.replace.active) $("fileInputReplace").click();
+        else $("fileInputAdd").click();
+      };
+
+      $("closeCamBtn").onclick = closeCamera;
+      $("switchCamBtn").onclick = switchCamera;
+      $("captureBtn").onclick = captureFromCamera;
+
+      $("camModalBackdrop").addEventListener("click", (e) => {
+        if (e.target === $("camModalBackdrop")) closeCamera();
+      });
+
+      $("downloadNextBtn").onclick = downloadNextFromHeader;
+
+      $("openDrawerBtn").onclick = openDrawer;
+      $("closeDrawerBtn").onclick = closeDrawer;
+      $("drawerBackdrop").onclick = closeDrawer;
+
+      $("start910Btn").onclick = onStartButtonClick;
+
+      // delete all moved to drawer bottom
+      $("deleteAllBtnDrawer").onclick = deleteAll;
+
+      $("toastDismissBtn").onclick = hideToast;
+
+      $("requestNotifBtn").onclick = requestNotificationPermission;
+      $("testBeepBtn").onclick = () => beepSoft();
+
+      // Settings / LINE
+      $("openSettingsBtn").onclick = openSettings;
+      $("closeSettingsBtn").onclick = closeSettings;
+      $("settingsBackdrop").addEventListener("click", (e) => {
+        if (e.target === $("settingsBackdrop")) closeSettings();
+      });
+
+      $("lineEnableToggle").addEventListener("change", async () => {
+        syncLineStateFromUI();
+        // NEW: เปิด -> บังคับให้ schedule ใหม่ได้ (เคลียร์ key)
+        if (state.line.enabled) {
+          state.line.lastScheduleKey = "";
+          saveLineCfg();
+          if (!state.line.code) openQuickLink(state.line.code);
+          maybeSyncLineSchedule("toggle-on");
+        } else {
+          await lineCancelSchedule("disabled");
+        }
+      });
+
+      // NEW: เปลี่ยน code -> cancel ของเก่าทันที + เคลียร์ scheduleKey เพื่อให้ส่งใหม่แน่นอน
+      $("lineCodeInput").addEventListener("change", async () => {
+        const oldCode = String(state.line.code || "").trim();
+        const newCode = String($("lineCodeInput").value || "").trim();
+
+        state.line.enabled = $("lineEnableToggle").checked;
+        state.line.workerUrl = DEFAULT_LINE_WORKER_URL;
+
+        if (oldCode && oldCode !== newCode) {
+          await lineCancelScheduleForCode(oldCode, "code changed");
+        }
+
+        state.line.code = newCode;
+        state.line.lastScheduleKey = "";
+        state.line.lastScheduledCode = "";
+        saveLineCfg();
+
+        if (state.line.enabled) {
+          if (!state.line.code) openQuickLink("");
+          else maybeSyncLineSchedule("code-change");
+        }
+      });
+
+      $("lineLinkBtn").onclick = doLinkFlowFromSettings;
+      $("lineTestBtn").onclick = doLineTest;
+      $("lineClearBtn").onclick = async () => {
+        const ok = confirm("ล้างค่า LINE ทั้งหมด?\n(ปิดสวิตช์/ล้าง Code/ยกเลิก schedule)");
+        if (!ok) return;
+        await lineCancelSchedule("clear");
+        state.line.enabled = false;
+        state.line.code = "";
+        state.line.workerUrl = DEFAULT_LINE_WORKER_URL;
+        state.line.lastScheduleKey = "";
+        state.line.lastScheduledCode = "";
+        saveLineCfg();
+        syncLineUIFromState();
+        showToast("ล้างค่าแล้ว ✅", "ตั้งค่าใหม่ได้เลย", 3000);
+      };
+      $("lineStatusBtn").onclick = doLineStatus;
+
+      // quick link modal
+      $("closeQuickLinkBtn").onclick = closeQuickLink;
+      $("quickLinkLaterBtn").onclick = closeQuickLink;
+      $("quickLinkGoBtn").onclick = doQuickLinkCopyAndGo;
+      $("lineQuickLinkBackdrop").addEventListener("click", (e) => {
+        if (e.target === $("lineQuickLinkBackdrop")) closeQuickLink();
+      });
+
+      if (state.line.enabled && !state.line.code) {
+        openQuickLink("");
+      }
+
+      $("logToggle").addEventListener("change", () => {
+        state.ui.logEnabled = $("logToggle").checked;
+        $("logPanel").style.display = state.ui.logEnabled ? "" : "none";
+        saveUIState();
+        log("Log enabled:", state.ui.logEnabled);
+      });
+      $("autoWakeToggle").addEventListener("change", () => {
+        state.ui.autoWake = $("autoWakeToggle").checked;
+        saveUIState();
+        log("AutoWake:", state.ui.autoWake);
+      });
+      $("mirrorHintToggle").addEventListener("change", () => {
+        state.ui.mirrorPref = $("mirrorHintToggle").checked;
+        saveUIState();
+
+        const facing = state.cam.facing;
+        const mirror = (facing === "user") && state.ui.mirrorPref;
+        $("camVideo").classList.toggle("mirror", mirror);
+        $("camMirrorPill").textContent = `mirror: ${mirror ? "ON" : "OFF"}`;
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          measureBars();
+          if (state.ui.autoWake) fireAlarmIfNeeded(false);
+          lightTick();
+        }
+      });
+
+      if (state.tickInterval) clearInterval(state.tickInterval);
+      state.tickInterval = setInterval(lightTick, 1000);
+
+      setSaveState("พร้อมใช้งาน", "wait");
+      heavyRender("boot");
+
+      log("BOOT OK", "dbType=", state.dbType, "nextSlot=", peekNextTag(), "LINE enabled=", state.line.enabled);
+    }
+
+    window.addEventListener("beforeunload", () => revokeAllThumbs());
+    boot();
+  </script>
+  <!-- Image Viewer Modal -->
+  <div id="imageViewerBackdrop" class="imageViewerBackdrop">
+    <div class="imageViewerContent">
+      <img id="imageViewerImg" class="imageViewerImg" src="" alt="Full view" />
+      <div id="imageViewerClose" class="imageViewerCloseBtn">✕</div>
+    </div>
+  </div>
+
+  <script>
+    // Image Viewer Logic
+    function openImageViewer(src) {
+      if (!src) return;
+      const backdrop = document.getElementById("imageViewerBackdrop");
+      const img = document.getElementById("imageViewerImg");
+      img.src = src;
+      backdrop.classList.add("show");
+    }
+
+    function closeImageViewer() {
+      const backdrop = document.getElementById("imageViewerBackdrop");
+      backdrop.classList.remove("show");
+      setTimeout(() => {
+        document.getElementById("imageViewerImg").src = "";
+      }, 200);
+    }
+
+    document.getElementById("imageViewerBackdrop").addEventListener("click", (e) => {
+      // Close if clicked on backdrop or close button, but not image itself
+      if (e.target.id !== "imageViewerImg") {
+        closeImageViewer();
+      }
+    });
+  </script>
+</body>
+
+</html>
