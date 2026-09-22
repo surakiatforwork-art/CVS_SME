@@ -658,6 +658,10 @@
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
+      cursor:help;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
     }
     .map-copy-store{
       width:26px;
@@ -674,6 +678,51 @@
       flex:0 0 auto;
     }
     .map-copy-store:active{ transform:scale(.94); }
+    .store-name-peek{
+      position:fixed;
+      z-index:1001000;
+      max-width:calc(100vw - 32px);
+      padding:10px 14px;
+      border:1px solid rgba(255,255,255,.42);
+      border-radius:999px 999px 999px 14px;
+      background:linear-gradient(135deg,#0f8f83,#0b7c73);
+      box-shadow:0 14px 30px rgba(6,78,70,.34);
+      color:#fff;
+      font-size:14px;
+      font-weight:1000;
+      line-height:1.25;
+      text-align:center;
+      pointer-events:none;
+      opacity:0;
+      transform:translate(-50%,-100%) scale(.12);
+      transform-origin:50% 100%;
+      transition:opacity .12s ease, transform .2s cubic-bezier(.2,.85,.25,1.2);
+    }
+    .store-name-peek::after{
+      content:'';
+      position:absolute;
+      left:50%;
+      bottom:-6px;
+      width:12px;
+      height:12px;
+      background:#0b7c73;
+      transform:translateX(-50%) rotate(45deg);
+      border-radius:0 0 3px 0;
+    }
+    .store-name-peek.show{
+      opacity:1;
+      transform:translate(-50%,-100%) scale(1);
+    }
+    .store-name-peek.below{
+      border-radius:14px 999px 999px 999px;
+      transform:translate(-50%,0) scale(.12);
+      transform-origin:50% 0;
+    }
+    .store-name-peek.below::after{
+      top:-6px;
+      bottom:auto;
+    }
+    .store-name-peek.below.show{ transform:translate(-50%,0) scale(1); }
     .leaflet-popup-content{
       width:min(224px, calc(100vw - 48px)) !important;
       margin:10px 12px;
@@ -1585,6 +1634,7 @@
 </div>
 
 <div id="toast" class="toast">—</div>
+<div id="storeNamePeek" class="store-name-peek" role="status" aria-live="polite" aria-hidden="true"></div>
 
 <div id="repOverlay" class="rep-overlay" aria-hidden="true">
   <div class="rep-modal" role="dialog" aria-modal="true">
@@ -1987,6 +2037,39 @@
     var url = apiUrl('saveNoted', params);
     if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
     return await jsonp(url, 30000);
+  }
+
+  var storeNamePeekPointerId = null;
+
+  function hideStoreNamePeek_(){
+    storeNamePeekPointerId = null;
+    var peek = $('storeNamePeek');
+    if(!peek) return;
+    peek.classList.remove('show', 'below');
+    peek.setAttribute('aria-hidden', 'true');
+  }
+
+  function showStoreNamePeek_(target, place, pointerId){
+    if(!target || !place) return;
+    var peek = $('storeNamePeek');
+    if(!peek) return;
+    var rect = target.getBoundingClientRect();
+    var showBelow = rect.top < 100;
+    peek.textContent = String(place.name || '');
+    peek.classList.toggle('below', showBelow);
+    peek.style.left = (rect.left + rect.width / 2) + 'px';
+    peek.style.top = (showBelow ? rect.bottom + 10 : rect.top - 8) + 'px';
+    peek.setAttribute('aria-hidden', 'false');
+    storeNamePeekPointerId = pointerId;
+    requestAnimationFrame(function(){
+      if(storeNamePeekPointerId !== pointerId) return;
+      peek.classList.add('show');
+      var bubble = peek.getBoundingClientRect();
+      var shift = 0;
+      if(bubble.left < 10) shift = 10 - bubble.left;
+      else if(bubble.right > window.innerWidth - 10) shift = (window.innerWidth - 10) - bubble.right;
+      if(shift){ peek.style.left = (rect.left + rect.width / 2 + shift) + 'px'; }
+    });
   }
 
   function storeCopyText_(place){
@@ -2542,7 +2625,10 @@
       map.on('dragstart', function(){ mapState.userInteracted = true; });
       map.on('zoomstart', function(){ mapState.userInteracted = true; });
       map.on('popupopen', function(){ document.body.classList.add('map-popup-open'); });
-      map.on('popupclose', function(){ document.body.classList.remove('map-popup-open'); });
+      map.on('popupclose', function(){
+        document.body.classList.remove('map-popup-open');
+        hideStoreNamePeek_();
+      });
       map.on('moveend zoomend', function(){
         try{
           var c = map.getCenter();
@@ -3809,7 +3895,7 @@
       var lastTextMap = formatLastVisited(p.lastVisitedDate);
 
       var popup =
-        '<div class="map-store-title"><span class="map-store-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="map-store-title"><span class="map-store-name" data-id="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</span>' +
           '<button class="map-copy-store" type="button" data-id="' + escapeHtml(p.id) + '" aria-label="คัดลอกข้อมูลร้าน" title="คัดลอกข้อมูลร้าน">⧉</button>' +
         '</div>' +
         '<div style="font-size:12px;color:#3b6760;margin-top:4px;">🗓️ ไปล่าสุด: ' + escapeHtml(lastTextMap) + '</div>' +
@@ -4426,6 +4512,36 @@
       console.error(err);
       showToast(err && err.message ? err.message : 'คัดลอกไม่สำเร็จ');
     }
+  }, true);
+
+  document.addEventListener('pointerdown', function(ev){
+    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
+    if(!name) return;
+    var id = name.getAttribute('data-id');
+    var place = PLACES.find(function(x){ return String(x.id) === String(id); });
+    if(!place) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    showStoreNamePeek_(name, place, ev.pointerId);
+  }, true);
+
+  document.addEventListener('pointerup', function(ev){
+    if(storeNamePeekPointerId === ev.pointerId) hideStoreNamePeek_();
+  }, true);
+  document.addEventListener('pointercancel', function(ev){
+    if(storeNamePeekPointerId === ev.pointerId) hideStoreNamePeek_();
+  }, true);
+  document.addEventListener('click', function(ev){
+    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
+    if(!name) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }, true);
+  document.addEventListener('contextmenu', function(ev){
+    var name = ev.target && ev.target.closest ? ev.target.closest('.map-store-name[data-id]') : null;
+    if(!name) return;
+    ev.preventDefault();
+    hideStoreNamePeek_();
   }, true);
 
   function requestGPS(){
