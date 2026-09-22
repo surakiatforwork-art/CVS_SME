@@ -56,8 +56,6 @@
       padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
       box-shadow:0 10px 24px rgba(0,0,0,.14);
       isolation:isolate;
-      transform:translateZ(0);
-      -webkit-transform:translateZ(0);
     }
     .hdr{ display:flex; gap:10px; align-items:center; }
     .hdr + .hdr{ margin-top:8px; }
@@ -1215,8 +1213,7 @@
       body.map-open header{
         height:25svh;
         height:25dvh;
-        overflow-y:auto;
-        overscroll-behavior:contain;
+        overflow:visible;
       }
       .hdr{ gap:2.2vw; }
       .hdr + .hdr{ margin-top:7px; }
