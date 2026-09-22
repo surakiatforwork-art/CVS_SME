@@ -1333,6 +1333,15 @@
     @media (max-width: 430px){
       .pickrow{ grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
       .pickrow .routepick{ grid-column:1 / -1; }
+      /* Keep Route visible inside the 25% map header on narrow phones. */
+      body.map-open .pickrow{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      body.map-open .pickrow .routepick{ grid-column:auto; }
+      body.map-open .sheetbtn{
+        gap:4px;
+        padding-left:1.5vw;
+        padding-right:1.5vw;
+        font-size:clamp(10px, 2.8vw, 12px);
+      }
     }
 
     @media (max-width: 390px){
