@@ -38,6 +38,12 @@ function doGet(e) {
       case 'saveNoted':
         result = api_saveNoted_(p.id, p.noted, p.sheet);
         break;
+      case 'updateRoute':
+        result = api_updateRoute_(p.id, p.route, p.sheet);
+        break;
+      case 'updateLocation':
+        result = api_updateLocation_(p.id, p.lat, p.lng, p.sheet);
+        break;
       default:
         result = { ok: false, message: 'Unknown action: ' + action };
         break;
@@ -364,6 +370,95 @@ function api_saveNoted_(idParam, notedParam, sheetParam) {
   }
 }
 
+function api_updateRoute_(idParam, routeParam, sheetParam) {
+  const id = safeStr_(idParam);
+  const route = safeStr_(routeParam);
+  if (!id) return { ok: false, message: 'Missing id' };
+  if (!/^\d+$/.test(route)) return { ok: false, message: 'Route ต้องเป็นตัวเลขเท่านั้น' };
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  }
+
+  try {
+    const info = getSheetWithName_(sheetParam);
+    const sheet = info.sheet;
+    const sheetName = info.sheetName;
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow < CONFIG.DATA_START_ROW) return { ok: false, message: 'No data rows' };
+
+    const headerMap = getHeaderMap_(sheet, lastCol);
+    const colList = mustCol_(headerMap, ['list', 'id']);
+    const colRoute = ensureRouteCol_(sheet, headerMap, lastCol);
+    const numRows = lastRow - CONFIG.HEADER_ROW;
+    const startRow = CONFIG.HEADER_ROW + 1;
+    const oldRev = getRev_(sheetName);
+    const rowIndex = findRowById_(sheet, sheetName, colList, startRow, numRows, oldRev, id);
+    if (!rowIndex) return { ok: false, message: 'ID not found: ' + id };
+
+    const routeCell = sheet.getRange(rowIndex, colRoute);
+    if (safeStr_(routeCell.getValue()) === route) {
+      return { ok: true, id, route, rev: oldRev, message: 'Route unchanged' };
+    }
+
+    routeCell.setValue(route);
+    const rev = bumpRev_(sheetName);
+    removeChunkedCache_(CacheService.getScriptCache(), 'places_v3_' + sheetName + '_rev_' + oldRev);
+    return { ok: true, id, route, rev, message: 'Updated route' };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
+function api_updateLocation_(idParam, latParam, lngParam, sheetParam) {
+  const id = safeStr_(idParam);
+  const lat = Number(latParam);
+  const lng = Number(lngParam);
+  if (!id) return { ok: false, message: 'Missing id' };
+  if (!isFinite(lat) || lat < -90 || lat > 90 || !isFinite(lng) || lng < -180 || lng > 180) {
+    return { ok: false, message: 'พิกัด lat,lng ไม่ถูกต้อง' };
+  }
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  }
+
+  try {
+    const info = getSheetWithName_(sheetParam);
+    const sheet = info.sheet;
+    const sheetName = info.sheetName;
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow < CONFIG.DATA_START_ROW) return { ok: false, message: 'No data rows' };
+
+    const headerMap = getHeaderMap_(sheet, lastCol);
+    const colList = mustCol_(headerMap, ['list', 'id']);
+    const colLocation = mustCol_(headerMap, ['location', 'latlng', 'lat_lng']);
+    const numRows = lastRow - CONFIG.HEADER_ROW;
+    const startRow = CONFIG.HEADER_ROW + 1;
+    const oldRev = getRev_(sheetName);
+    const rowIndex = findRowById_(sheet, sheetName, colList, startRow, numRows, oldRev, id);
+    if (!rowIndex) return { ok: false, message: 'ID not found: ' + id };
+
+    const location = lat.toFixed(6) + ',' + lng.toFixed(6);
+    const locationCell = sheet.getRange(rowIndex, colLocation);
+    const current = parseLatLng_(locationCell.getValue());
+    if (current && Math.abs(current.lat - lat) < 0.0000005 && Math.abs(current.lng - lng) < 0.0000005) {
+      return { ok: true, id, lat, lng, rev: oldRev, message: 'Location unchanged' };
+    }
+
+    locationCell.setValue(location);
+    const rev = bumpRev_(sheetName);
+    removeChunkedCache_(CacheService.getScriptCache(), 'places_v3_' + sheetName + '_rev_' + oldRev);
+    return { ok: true, id, lat, lng, rev, message: 'Updated location' };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
 function ensureLastVisitedDateCol_(sheet, headerMap, lastCol) {
   const aliases = ['lastvisiteddate', 'last_visited_date', 'lastvisited', 'visited_date', 'visiteddate', 'last_visit_date'];
   let col = pickCol_(headerMap, aliases);
@@ -425,6 +520,16 @@ function ensureNotedCol_(sheet, headerMap, lastCol) {
   const newCol = lastCol + 1;
   sheet.getRange(CONFIG.HEADER_ROW, newCol).setValue(CONFIG.NOTED_HEADER);
   headerMap[normHeader_(CONFIG.NOTED_HEADER)] = newCol;
+  return newCol;
+}
+
+function ensureRouteCol_(sheet, headerMap, lastCol) {
+  const aliases = ['route', 'route_no', 'route_number', 'routeno', 'รูท', 'เส้นทาง'];
+  let col = pickCol_(headerMap, aliases);
+  if (col) return col;
+  const newCol = lastCol + 1;
+  sheet.getRange(CONFIG.HEADER_ROW, newCol).setValue('route');
+  headerMap[normHeader_('route')] = newCol;
   return newCol;
 }
 

@@ -613,6 +613,24 @@
       flex-wrap:wrap;
     }
     .map-actions .map-link:active{ transform:scale(.99); }
+    .map-edit-actions{
+      display:flex;
+      gap:6px;
+      margin-top:10px;
+      justify-content:flex-start;
+    }
+    .map-edit-actions .map-link{
+      width:auto;
+      min-height:32px;
+      padding:6px 9px;
+      border-radius:10px;
+      font-size:12px;
+    }
+    .map-edit{
+      border-color:rgba(7,25,21,.16);
+      background:rgba(7,25,21,.04);
+      color:#315b55;
+    }
     .marker-visited{
       filter:grayscale(1);
       opacity:.72;
@@ -890,6 +908,122 @@
       padding:10px;
     }
     .set-overlay.show{ display:flex; }
+    .store-edit-overlay{
+      position:fixed;
+      inset:0;
+      z-index:100001;
+      background:rgba(0,0,0,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:12px;
+    }
+    .store-edit-overlay.show{ display:flex; }
+    .store-edit-modal{
+      width:min(560px,100%);
+      max-height:min(92dvh,100%);
+      background:#fff;
+      border-radius:18px;
+      border:1px solid rgba(0,0,0,.10);
+      box-shadow:0 20px 70px rgba(0,0,0,.28);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+    .store-location-modal{ width:min(920px,100%); }
+    .store-edit-bar{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      background:linear-gradient(90deg,#0f8f83,#0b7c73);
+      color:#fff;
+    }
+    .store-edit-title{ font-weight:1000; }
+    .store-edit-sub{
+      margin-top:2px;
+      font-size:12px;
+      font-weight:900;
+      opacity:.92;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .store-edit-close{
+      margin-left:auto;
+      min-height:36px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.14);
+      color:#fff;
+      padding:7px 10px;
+      font-weight:1000;
+      cursor:pointer;
+    }
+    .store-edit-body{
+      padding:14px;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      background:linear-gradient(180deg,#fff,#fbfffe);
+    }
+    .store-edit-label{
+      display:block;
+      margin:0 0 7px;
+      color:#23443f;
+      font-size:13px;
+      font-weight:1000;
+    }
+    .store-edit-input{
+      width:100%;
+      min-height:46px;
+      padding:10px 12px;
+      border:1px solid rgba(7,25,21,.18);
+      border-radius:14px;
+      color:#071915;
+      font:inherit;
+      font-weight:900;
+      outline:none;
+    }
+    .store-edit-input:focus{ border-color:rgba(15,143,131,.72); box-shadow:0 0 0 3px rgba(20,184,166,.13); }
+    .store-edit-hint{
+      margin:8px 0 0;
+      color:#3b6760;
+      font-size:12px;
+      font-weight:800;
+    }
+    #locationEditMap{
+      width:100%;
+      height:min(56dvh,560px);
+      min-height:280px;
+      margin:0 0 14px;
+      border:1px solid rgba(7,25,21,.12);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .store-edit-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      padding:12px 14px;
+      border-top:1px solid rgba(0,0,0,.10);
+      background:#fff;
+    }
+    .store-edit-btn{
+      min-height:42px;
+      border-radius:14px;
+      border:1px solid rgba(7,25,21,.12);
+      background:#f0f5f4;
+      color:#071915;
+      padding:9px 13px;
+      font-weight:1000;
+      cursor:pointer;
+    }
+    .store-edit-save{
+      border-color:rgba(20,184,166,.35);
+      background:rgba(20,184,166,.16);
+      color:#064e46;
+    }
+    .store-edit-btn:disabled{ opacity:.58; cursor:not-allowed; }
     .set-modal{
       width:min(900px, 100%);
       height:min(92vh, 100%);
@@ -1331,6 +1465,49 @@
   </div>
 </div>
 
+<div id="routeEditOverlay" class="store-edit-overlay" aria-hidden="true">
+  <div class="store-edit-modal" role="dialog" aria-modal="true" aria-label="ปรับ Route">
+    <div class="store-edit-bar">
+      <div>
+        <div class="store-edit-title">ปรับ Route</div>
+        <div id="routeEditSub" class="store-edit-sub">—</div>
+      </div>
+      <button class="store-edit-close" type="button" data-store-edit-close="route">ปิด</button>
+    </div>
+    <div class="store-edit-body">
+      <label class="store-edit-label" for="routeEditInput">หมายเลข Route ใหม่</label>
+      <input id="routeEditInput" class="store-edit-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="เช่น 7">
+      <p class="store-edit-hint">ใส่ตัวเลข Route แล้วกดบันทึก ระบบจะอัปเดตเฉพาะร้านนี้ในชีตปัจจุบัน</p>
+    </div>
+    <div class="store-edit-actions">
+      <button class="store-edit-btn" type="button" data-store-edit-close="route">ยกเลิก</button>
+      <button id="routeEditSave" class="store-edit-btn store-edit-save" type="button">บันทึก Route</button>
+    </div>
+  </div>
+</div>
+
+<div id="locationEditOverlay" class="store-edit-overlay" aria-hidden="true">
+  <div class="store-edit-modal store-location-modal" role="dialog" aria-modal="true" aria-label="ปรับ Location">
+    <div class="store-edit-bar">
+      <div>
+        <div class="store-edit-title">ปรับ Location</div>
+        <div id="locationEditSub" class="store-edit-sub">—</div>
+      </div>
+      <button class="store-edit-close" type="button" data-store-edit-close="location">ปิด</button>
+    </div>
+    <div class="store-edit-body">
+      <div id="locationEditMap" aria-label="แผนที่ปรับตำแหน่งร้าน"></div>
+      <label class="store-edit-label" for="locationEditInput">พิกัด lat,lng</label>
+      <input id="locationEditInput" class="store-edit-input" type="text" autocomplete="off" placeholder="13.123456, 100.123456">
+      <p class="store-edit-hint">ลากหมุดบนแผนที่ หรือกรอกพิกัดเอง แล้วกดบันทึก</p>
+    </div>
+    <div class="store-edit-actions">
+      <button class="store-edit-btn" type="button" data-store-edit-close="location">ยกเลิก</button>
+      <button id="locationEditSave" class="store-edit-btn store-edit-save" type="button">บันทึก Location</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec',
@@ -1633,6 +1810,47 @@
     if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
     return await jsonp(url, 30000);
   }
+
+  async function apiUpdateRoute(id, route, sheetName){
+    var params = { id:id, route:route };
+    if(sheetName) params.sheet = sheetName;
+    var url = apiUrl('updateRoute', params);
+    if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
+    return await jsonp(url, 30000);
+  }
+
+  async function apiUpdateLocation(id, lat, lng, sheetName){
+    var params = { id:id, lat:lat, lng:lng };
+    if(sheetName) params.sheet = sheetName;
+    var url = apiUrl('updateLocation', params);
+    if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
+    return await jsonp(url, 30000);
+  }
+
+  $('routeEditSave').addEventListener('click', saveRouteEditor_);
+  $('locationEditSave').addEventListener('click', saveLocationEditor_);
+  document.querySelectorAll('[data-store-edit-close]').forEach(function(button){
+    button.addEventListener('click', function(){
+      if(button.getAttribute('data-store-edit-close') === 'route') closeRouteEditor();
+      else closeLocationEditor();
+    });
+  });
+  $('routeEditOverlay').addEventListener('click', function(ev){
+    if(ev.target === $('routeEditOverlay')) closeRouteEditor();
+  });
+  $('locationEditOverlay').addEventListener('click', function(ev){
+    if(ev.target === $('locationEditOverlay')) closeLocationEditor();
+  });
+  $('routeEditInput').addEventListener('keydown', function(ev){
+    if(ev.key === 'Enter') saveRouteEditor_();
+  });
+  $('locationEditInput').addEventListener('change', function(){
+    var point = parseEditorLatLng_($('locationEditInput').value);
+    if(point) setLocationEditorMarker_(point.lat, point.lng, true);
+  });
+  $('locationEditInput').addEventListener('keydown', function(ev){
+    if(ev.key === 'Enter') saveLocationEditor_();
+  });
 
   var SETTINGS = loadSettings_();
 
@@ -2055,6 +2273,12 @@
   var currentLatLng = null;
   var meIcon = null;
   var markerById = new Map();
+  var routeEditPlace = null;
+  var locationEditPlace = null;
+  var routeEditSaving = false;
+  var locationEditSaving = false;
+  var locationEditMap = null;
+  var locationEditMarker = null;
 
   var mapState = loadMapState_();
 
@@ -2187,6 +2411,187 @@
     var url = getOpenLink(place);
     if(!url){ showToast('ไม่มีลิงก์นำทาง'); return; }
     window.open(url, '_blank');
+  }
+
+  function editorPlaceLabel_(place){
+    if(!place) return '—';
+    return '[' + String(place.id || '') + '] ' + String(place.name || '');
+  }
+
+  function setEditorSaving_(kind, saving){
+    var button = kind === 'route' ? $('routeEditSave') : $('locationEditSave');
+    if(!button) return;
+    button.disabled = !!saving;
+    button.textContent = saving
+      ? 'กำลังบันทึก…'
+      : (kind === 'route' ? 'บันทึก Route' : 'บันทึก Location');
+  }
+
+  function closeRouteEditor(){
+    if(routeEditSaving) return;
+    $('routeEditOverlay').classList.remove('show');
+    $('routeEditOverlay').setAttribute('aria-hidden', 'true');
+    routeEditPlace = null;
+  }
+
+  function openRouteEditor(place){
+    if(!place) return;
+    routeEditPlace = place;
+    $('routeEditSub').textContent = editorPlaceLabel_(place);
+    $('routeEditInput').value = String(place.route || '');
+    $('routeEditOverlay').classList.add('show');
+    $('routeEditOverlay').setAttribute('aria-hidden', 'false');
+    setTimeout(function(){ try{ $('routeEditInput').focus(); }catch(e){} }, 0);
+  }
+
+  async function saveRouteEditor_(){
+    if(routeEditSaving || !routeEditPlace) return;
+    var route = String($('routeEditInput').value || '').trim();
+    if(!/^\d+$/.test(route)){
+      showToast('Route ต้องเป็นตัวเลขเท่านั้น');
+      $('routeEditInput').focus();
+      return;
+    }
+
+    routeEditSaving = true;
+    setEditorSaving_('route', true);
+    try{
+      var place = routeEditPlace;
+      var sheetAtCall = String(CURRENT_SHEET || '');
+      var res = await enqueueSheetWrite_(function(){
+        return apiUpdateRoute(place.id, route, sheetAtCall);
+      });
+      if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'บันทึก Route ไม่สำเร็จ');
+
+      place.route = route;
+      if(res.rev !== undefined && res.rev !== null) META.rev = res.rev;
+      persistCurrentPlacesCache_(sheetAtCall);
+      renderRouteFilter_();
+      renderList();
+      if(map) renderMap();
+      routeEditSaving = false;
+      setEditorSaving_('route', false);
+      closeRouteEditor();
+      showToast('บันทึก Route ' + route + ' แล้ว');
+    }catch(err){
+      console.error(err);
+      showToast(err && err.message ? err.message : 'บันทึก Route ไม่สำเร็จ');
+    }finally{
+      if(routeEditSaving){
+        routeEditSaving = false;
+        setEditorSaving_('route', false);
+      }
+    }
+  }
+
+  function parseEditorLatLng_(value){
+    var parts = String(value || '').trim().split(',');
+    if(parts.length !== 2) return null;
+    var lat = Number(parts[0].trim());
+    var lng = Number(parts[1].trim());
+    if(!isFinite(lat) || lat < -90 || lat > 90 || !isFinite(lng) || lng < -180 || lng > 180) return null;
+    return { lat:lat, lng:lng };
+  }
+
+  function locationEditorText_(lat, lng){
+    return Number(lat).toFixed(6) + ', ' + Number(lng).toFixed(6);
+  }
+
+  function setLocationEditorMarker_(lat, lng, moveMap){
+    if(!locationEditMap) return;
+    var point = [Number(lat), Number(lng)];
+    if(locationEditMarker){
+      locationEditMarker.setLatLng(point);
+    }else{
+      locationEditMarker = L.marker(point, { draggable:true }).addTo(locationEditMap);
+      locationEditMarker.on('dragend', function(){
+        var ll = locationEditMarker.getLatLng();
+        $('locationEditInput').value = locationEditorText_(ll.lat, ll.lng);
+      });
+    }
+    $('locationEditInput').value = locationEditorText_(point[0], point[1]);
+    if(moveMap) locationEditMap.setView(point, Math.max(locationEditMap.getZoom() || 16, 16));
+  }
+
+  function closeLocationEditor(){
+    if(locationEditSaving) return;
+    $('locationEditOverlay').classList.remove('show');
+    $('locationEditOverlay').setAttribute('aria-hidden', 'true');
+    locationEditPlace = null;
+  }
+
+  function openLocationEditor(place){
+    if(!place) return;
+    locationEditPlace = place;
+    $('locationEditSub').textContent = editorPlaceLabel_(place);
+    $('locationEditOverlay').classList.add('show');
+    $('locationEditOverlay').setAttribute('aria-hidden', 'false');
+
+    setTimeout(function(){
+      if(!locationEditPlace || !$('locationEditOverlay').classList.contains('show')) return;
+      var point = hasLatLng_(place)
+        ? { lat:Number(place.lat), lng:Number(place.lng) }
+        : (currentLatLng || (map ? (function(){ var c = map.getCenter(); return { lat:c.lat, lng:c.lng }; })() : { lat:13.7563, lng:100.5018 }));
+
+      if(!locationEditMap){
+        locationEditMap = L.map('locationEditMap', { zoomControl:true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom:19,
+          attribution:'&copy; OpenStreetMap'
+        }).addTo(locationEditMap);
+        locationEditMap.on('click', function(ev){
+          setLocationEditorMarker_(ev.latlng.lat, ev.latlng.lng, false);
+        });
+      }
+      locationEditMap.invalidateSize();
+      locationEditMap.setView([point.lat, point.lng], 16);
+      setLocationEditorMarker_(point.lat, point.lng, false);
+      $('locationEditInput').focus();
+    }, 0);
+  }
+
+  async function saveLocationEditor_(){
+    if(locationEditSaving || !locationEditPlace) return;
+    var point = parseEditorLatLng_($('locationEditInput').value);
+    if(!point && locationEditMarker){
+      var markerPoint = locationEditMarker.getLatLng();
+      point = { lat:markerPoint.lat, lng:markerPoint.lng };
+    }
+    if(!point){
+      showToast('กรุณาใส่พิกัด lat,lng ให้ถูกต้อง');
+      $('locationEditInput').focus();
+      return;
+    }
+
+    locationEditSaving = true;
+    setEditorSaving_('location', true);
+    try{
+      var place = locationEditPlace;
+      var sheetAtCall = String(CURRENT_SHEET || '');
+      var res = await enqueueSheetWrite_(function(){
+        return apiUpdateLocation(place.id, point.lat, point.lng, sheetAtCall);
+      });
+      if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'บันทึก Location ไม่สำเร็จ');
+
+      place.lat = point.lat;
+      place.lng = point.lng;
+      if(res.rev !== undefined && res.rev !== null) META.rev = res.rev;
+      persistCurrentPlacesCache_(sheetAtCall);
+      renderList();
+      if(map) renderMap();
+      locationEditSaving = false;
+      setEditorSaving_('location', false);
+      closeLocationEditor();
+      showToast('บันทึก Location แล้ว');
+    }catch(err){
+      console.error(err);
+      showToast(err && err.message ? err.message : 'บันทึก Location ไม่สำเร็จ');
+    }finally{
+      if(locationEditSaving){
+        locationEditSaving = false;
+        setEditorSaving_('location', false);
+      }
+    }
   }
 
   function filteredPlaces(includeVisited){
@@ -3186,13 +3591,19 @@
         ? '<button class="map-link disabled" type="button" disabled>ไปแล้ว</button>'
         : '<button class="map-link map-done" type="button" data-id="' + escapeHtml(p.id) + '">ไปแล้ว</button>';
 
+      var editHtml =
+        '<div class="map-edit-actions">' +
+          '<button class="map-link map-edit map-edit-route" type="button" data-id="' + escapeHtml(p.id) + '">ปรับ Route</button>' +
+          '<button class="map-link map-edit map-edit-location" type="button" data-id="' + escapeHtml(p.id) + '">ปรับ Location</button>' +
+        '</div>';
+
       var lastTextMap = formatLastVisited(p.lastVisitedDate);
 
       var popup =
         '<div style="font-weight:1000;color:#071915">[' + escapeHtml(p.id) + '] ' + escapeHtml(p.name) + '</div>' +
         '<div style="font-size:12px;color:#3b6760;margin-top:4px;">🗓️ ไปล่าสุด: ' + escapeHtml(lastTextMap) + '</div>' +
         (p.visited ? '<div style="font-size:12px;color:#64748b;margin-top:4px;font-weight:900;">ไปแล้ว</div>' : '') +
-        '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>';
+        '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml;
 
       var markerOptions = p.visited ? { icon: visitedIcon } : {};
       var mk = L.marker([p.lat, p.lng], markerOptions).addTo(placesLayer).bindPopup(popup);
@@ -3768,6 +4179,22 @@
     openReport(place);
   }, true);
 
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.map-edit-route, .map-edit-location') : null;
+    if(!btn) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    var id = btn.getAttribute('data-id');
+    var place = PLACES.find(function(x){ return String(x.id) === String(id); });
+    if(!place){ showToast('ไม่พบรายการสำหรับปุ่มนี้'); return; }
+
+    try{ if(map) map.closePopup(); }catch(e){}
+    if(btn.classList.contains('map-edit-route')) openRouteEditor(place);
+    else openLocationEditor(place);
+  }, true);
+
   function requestGPS(){
     if(!navigator.geolocation){
       $('gpsPill').textContent = 'GPS: ไม่รองรับ';
@@ -3905,6 +4332,8 @@
       if(sheetDropIsOpen_()){ closeSheetDrop_(); return; }
       if(sortDropIsOpen_()){ closeSortDrop_(); return; }
       if(routeDropIsOpen_()){ closeRouteDrop_(); return; }
+      if($('routeEditOverlay').classList.contains('show')){ closeRouteEditor(); return; }
+      if($('locationEditOverlay').classList.contains('show')){ closeLocationEditor(); return; }
       if(document.body.classList.contains('set-open')){ closeSettings(); return; }
       if($('historyOverlay').classList.contains('show')){ closeReportHistory(); return; }
       if(document.body.classList.contains('rep-open')){ closeReport(); return; }
