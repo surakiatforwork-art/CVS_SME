@@ -1710,6 +1710,11 @@
     });
   }
 
+  function reportTeamLine(){
+    const sheetName = safeText(embedPrefillContext.sheetName).trim();
+    return sheetName ? `CVS: ${sheetName}` : TEAM_REPORT;
+  }
+
   function buildReportText(){
     const d = parseISODate(reportDate.value) || new Date();
     const locationText = safeText(locationArea.value).trim();
@@ -1718,7 +1723,7 @@
 
     const lines = [
       `วันที่ ${formatReportDateBuddhist2(d)}`,
-      TEAM_REPORT,
+      reportTeamLine(),
       `แอคเคาท์ : ${safeText(account.value).trim()}`,
       `รหัสสาขา : ${safeText(branchCode.value).trim()}`,
       `ชื่อสาขา : ${safeText(branchName.value).trim()}`,
