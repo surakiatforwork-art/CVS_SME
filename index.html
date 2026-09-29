@@ -352,7 +352,8 @@
       cursor:pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    button:active{transform:scale(.99)}
+    button{transition:transform .14s ease,filter .14s ease,opacity .14s ease,box-shadow .14s ease}
+    button:active{transform:scale(.97);filter:brightness(.96)}
     .btn-solid{
       background:rgba(255,255,255,.92);
       color:#0b2f2a;
@@ -508,7 +509,9 @@
       font-weight:1000;
       cursor:pointer;
     }
-    .map-history-fab:active{ transform:scale(.96); }
+    .map-history-fab{transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
+    .map-history-fab:hover{box-shadow:0 14px 30px rgba(6,78,70,.40)}
+    .map-history-fab:active{ transform:scale(.94); }
 
     body.map-open main{
       height: calc(100svh - var(--hdrH) - var(--tabsH));
@@ -526,6 +529,8 @@
       z-index:0;
     }
 
+    @keyframes overlayIn{from{opacity:0}to{opacity:1}}
+    @keyframes popupIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
     .backdrop{
       position:fixed; inset:0;
       display:none; align-items:center; justify-content:center;
@@ -533,6 +538,8 @@
       background:rgba(0,0,0,.45);
       z-index:99999;
     }
+    .backdrop[aria-hidden="false"]{animation:overlayIn .18s ease-out both}
+    .backdrop[aria-hidden="false"] .modal{animation:popupIn .26s cubic-bezier(.2,.8,.25,1) both}
     .modal{
       width:min(560px,100%);
       background:#fff;
@@ -948,7 +955,8 @@
       justify-content:center;
       padding:10px;
     }
-    .rep-overlay.show{ display:flex; }
+    .rep-overlay.show{ display:flex; animation:overlayIn .18s ease-out both; }
+    .rep-overlay.show .rep-modal{ animation:popupIn .28s cubic-bezier(.2,.8,.25,1) both; }
     .rep-modal{
       width:min(1200px, 100%);
       height:min(92vh, 100%);
@@ -992,10 +1000,16 @@
       font-weight:1000;
       cursor:pointer;
     }
+    .rep-frame-stage{position:relative;flex:1;min-height:0;background:#fff}
+    .rep-frame-loader{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(135deg,#f7fffd,#edf9f6);color:#386a63;font-weight:1000;transition:opacity .2s ease,visibility .2s ease}
+    .rep-frame-loader .spinner{width:38px;height:38px;border-width:4px;margin:0}
+    .rep-modal:not(.is-loading) .rep-frame-loader{opacity:0;visibility:hidden;pointer-events:none}
+    .rep-frame-stage iframe{position:relative;z-index:2;opacity:1;transition:opacity .18s ease}
+    .rep-modal.is-loading .rep-frame-stage iframe{opacity:0;pointer-events:none}
     #repFrame,
     #historyFrame{
       width:100%;
-      height: calc(100% - var(--repBarH));
+      height:100%;
       border:0;
       background:#fff;
     }
@@ -1010,7 +1024,8 @@
       justify-content:center;
       padding:10px;
     }
-    .set-overlay.show{ display:flex; }
+    .set-overlay.show{ display:flex; animation:overlayIn .18s ease-out both; }
+    .set-overlay.show .set-modal{animation:popupIn .26s cubic-bezier(.2,.8,.25,1) both}
     .store-edit-overlay{
       position:fixed;
       inset:0;
@@ -1021,7 +1036,12 @@
       justify-content:center;
       padding:12px;
     }
-    .store-edit-overlay.show{ display:flex; }
+    .store-edit-overlay.show{ display:flex; animation:overlayIn .18s ease-out both; }
+    .store-edit-overlay.show .store-edit-modal{animation:popupIn .26s cubic-bezier(.2,.8,.25,1) both}
+
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+    }
     .store-edit-modal{
       width:min(560px,100%);
       max-height:min(92dvh,100%);
@@ -1199,6 +1219,9 @@
       color:#3b6760;
       font-size:12px;
     }
+    .set-card + .set-card{margin-top:12px}
+    .set-check{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:1000;color:#071915}
+    .set-check input{width:20px;height:20px;accent-color:#0f8f83}
     .seg{
       display:flex;
       gap:10px;
@@ -1644,24 +1667,24 @@
 <div id="storeNamePeek" class="store-name-peek" role="status" aria-live="polite" aria-hidden="true"></div>
 
 <div id="repOverlay" class="rep-overlay" aria-hidden="true">
-  <div class="rep-modal" role="dialog" aria-modal="true">
+  <div class="rep-modal is-loading" role="dialog" aria-modal="true">
     <div class="rep-bar">
       <div class="rep-title">🧾 Report</div>
       <div id="repSub" class="rep-sub">—</div>
       <button id="repClose" class="rep-close" type="button">ปิด</button>
     </div>
-    <iframe id="repFrame" title="Report Popup" src=""></iframe>
+    <div class="rep-frame-stage"><div class="rep-frame-loader"><div class="spinner"></div><span>กำลังเตรียม Report…</span></div><iframe id="repFrame" title="Report Popup" src=""></iframe></div>
   </div>
 </div>
 
 <div id="historyOverlay" class="rep-overlay" aria-hidden="true">
-  <div class="rep-modal" role="dialog" aria-modal="true" aria-label="ประวัติ Report">
+  <div class="rep-modal is-loading" role="dialog" aria-modal="true" aria-label="ประวัติ Report">
     <div class="rep-bar">
       <div class="rep-title">🧾 ประวัติ Report</div>
       <div class="rep-sub">คัดลอก ลบ และเลือกรายการได้จากหน้าต่างนี้</div>
       <button id="historyClose" class="rep-close" type="button">ปิด</button>
     </div>
-    <iframe id="historyFrame" title="Report History" src=""></iframe>
+    <div class="rep-frame-stage"><div class="rep-frame-loader"><div class="spinner"></div><span>กำลังอัปเดตประวัติ…</span></div><iframe id="historyFrame" title="Report History" src=""></iframe></div>
   </div>
 </div>
 
@@ -1688,6 +1711,29 @@
           <label>
             <input type="radio" name="navPriority" value="latLngFirst">
             <div class="seg-pill">ใช้ lat/lng ก่อน (LatLng-first)</div>
+          </label>
+        </div>
+      </div>
+      <div class="set-card">
+        <div class="set-h">
+          <strong>เส้นทางบนแผนที่</strong>
+          <small>คำนวณและแสดงเส้นจากตำแหน่งปัจจุบันไปยังร้านเมื่อกดนำทาง</small>
+        </div>
+        <label class="set-check"><input id="showWebRoute" type="checkbox"> แสดงเส้นทางบนเว็บ</label>
+      </div>
+      <div class="set-card">
+        <div class="set-h">
+          <strong>GPS</strong>
+          <small>แบบ Real-time จะอัปเดตตำแหน่งต่อเนื่องและใช้แบตเตอรี่มากกว่า</small>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="รูปแบบ GPS">
+          <label>
+            <input type="radio" name="gpsMode" value="normal">
+            <div class="seg-pill">แบบปกติ</div>
+          </label>
+          <label>
+            <input type="radio" name="gpsMode" value="realtime">
+            <div class="seg-pill">Real-time</div>
           </label>
         </div>
       </div>
@@ -1745,7 +1791,7 @@
 
 <script>
   const CONFIG = {
-    API_URL: 'https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec',
+    API_URL: 'https://script.google.com/macros/s/AKfycbw91N5J4z1Jjn0rZz8qnn-ZFmP6bYJ2IZaKrOXrDaTj3aJoAvGJCVJBy982T_pXilNS/exec',
     REPORT_PATH: 'Tools/Report.html'
   };
 
@@ -2022,6 +2068,59 @@
     return await jsonpWithRetry(url, 60000, 1);
   }
 
+  function readReportConfigCache_(accountKey){
+    try{
+      var all = JSON.parse(localStorage.getItem('PT_REPORT_CONFIG_CACHE_V1') || '{}');
+      var cached = all[accountKey];
+      return cached && cached.result && Array.isArray(cached.result.items) ? cached : null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function writeReportConfigCache_(accountKey, result){
+    try{
+      var storeKey = 'PT_REPORT_CONFIG_CACHE_V1';
+      var all = JSON.parse(localStorage.getItem(storeKey) || '{}');
+      all[accountKey] = { version: result.version, result: result };
+      localStorage.setItem(storeKey, JSON.stringify(all));
+    }catch(e){}
+  }
+
+  // Marker popups only compare versions. The full catalog downloads once, when it changed.
+  function refreshReportConfigCache_(accountName){
+    var accountKey = String(accountName || '').trim().toUpperCase();
+    if(!accountKey) return Promise.resolve({ version:null, verified:false, changed:false });
+    if(REPORT_CONFIG_WARMING[accountKey]) return REPORT_CONFIG_WARMING[accountKey];
+
+    var cached = readReportConfigCache_(accountKey);
+    var metaUrl = apiUrl('getReportConfigMeta', { account: accountKey });
+    if(!metaUrl) return Promise.resolve({ version: cached ? cached.version : null, verified:false, changed:false });
+
+    var work = jsonp(metaUrl, 15000).then(function(meta){
+      if(!meta || !meta.ok) throw new Error((meta && meta.message) || 'โหลดสถานะ config ไม่สำเร็จ');
+      if(cached && Number(cached.version) === Number(meta.version)){
+        return { version: meta.version, verified:true, changed:false };
+      }
+      var configUrl = apiUrl('getReportConfig', { account: accountKey });
+      if(!configUrl) throw new Error('ยังไม่ได้ตั้งค่า CONFIG.API_URL');
+      return jsonp(configUrl, 30000).then(function(result){
+        if(!result || !result.ok || !Array.isArray(result.items)){
+          throw new Error((result && result.message) || 'โหลด config รายงานไม่สำเร็จ');
+        }
+        writeReportConfigCache_(accountKey, result);
+        return { version: result.version, verified:true, changed:true };
+      });
+    }).catch(function(){
+      return { version: cached ? cached.version : null, verified:false, changed:false };
+    }).finally(function(){
+      delete REPORT_CONFIG_WARMING[accountKey];
+    });
+
+    REPORT_CONFIG_WARMING[accountKey] = work;
+    return work;
+  }
+
   async function apiMarkVisited(id, sheetName){
     var params = { id:id };
     if(sheetName) params.sheet = sheetName;
@@ -2155,14 +2254,15 @@
   var SETTINGS = loadSettings_();
 
   function loadSettings_(){
-    var def = { navPriority: 'linkFirst' };
+    var def = { navPriority: 'linkFirst', showWebRoute: true, gpsMode: 'normal' };
     try{
       var raw = localStorage.getItem(SETTINGS_KEY);
       if(!raw) return def;
       var obj = JSON.parse(raw);
       if(!obj || typeof obj !== 'object') return def;
       var v = (obj.navPriority === 'latLngFirst') ? 'latLngFirst' : 'linkFirst';
-      return { navPriority: v };
+      var gpsMode = obj.gpsMode === 'realtime' ? 'realtime' : 'normal';
+      return { navPriority: v, showWebRoute: obj.showWebRoute !== false, gpsMode: gpsMode };
     }catch(e){
       return def;
     }
@@ -2177,6 +2277,9 @@
     var v = (SETTINGS && SETTINGS.navPriority) ? SETTINGS.navPriority : 'linkFirst';
     var radios = document.querySelectorAll('input[name="navPriority"]');
     radios.forEach(function(r){ r.checked = (r.value === v); });
+    $('showWebRoute').checked = !(SETTINGS && SETTINGS.showWebRoute === false);
+    var gpsMode = (SETTINGS && SETTINGS.gpsMode) === 'realtime' ? 'realtime' : 'normal';
+    document.querySelectorAll('input[name="gpsMode"]').forEach(function(r){ r.checked = (r.value === gpsMode); });
 
     $('setOverlay').classList.add('show');
     $('setOverlay').setAttribute('aria-hidden','false');
@@ -2191,7 +2294,13 @@
     var sel = document.querySelector('input[name="navPriority"]:checked');
     var v = sel ? String(sel.value) : 'linkFirst';
     v = (v === 'latLngFirst') ? 'latLngFirst' : 'linkFirst';
-    saveSettings_({ navPriority: v });
+    var gpsSel = document.querySelector('input[name="gpsMode"]:checked');
+    var gpsMode = gpsSel && gpsSel.value === 'realtime' ? 'realtime' : 'normal';
+    var next = { navPriority: v, showWebRoute: $('showWebRoute').checked, gpsMode: gpsMode };
+    saveSettings_(next);
+    if(!next.showWebRoute) clearWebRoute_();
+    if(map) renderMap();
+    applyGpsMode_();
     closeSettings();
     showToast('บันทึกแล้ว ✅');
   }
@@ -2581,9 +2690,22 @@
 
   var map = null;
   var placesLayer = null;
+  var placesCanvasRenderer = null;
+  // Keep the original Leaflet pin markers as the default map appearance.
+  var MAP_MARKER_RENDERER = { mode:'dom' };
+  var MAP_VIEWPORT_MARKERS = { enabled:false, padding:0.25, focusZoom:16 };
+  var viewportMarkerTimer = null;
   var currentMarker = null;
   var currentLatLng = null;
   var meIcon = null;
+  var gpsWatchId = null;
+  var gpsMarkerAnimation = null;
+  var lastRealtimeRenderAt = 0;
+  var routeLayer = null;
+  var routeRequest = null;
+  var activeWebRoute = null;
+  var routeArrivalTimer = null;
+  var routeRefreshTimer = null;
   var markerById = new Map();
   var routeEditPlace = null;
   var locationEditPlace = null;
@@ -2630,6 +2752,9 @@
       }).addTo(map);
 
       placesLayer = L.layerGroup().addTo(map);
+      if(MAP_MARKER_RENDERER.mode === 'canvas'){
+        placesCanvasRenderer = L.canvas({ padding:0.5 });
+      }
 
       meIcon = L.divIcon({
         className: 'me-icon',
@@ -2658,6 +2783,7 @@
           mapState.zoom = map.getZoom();
           saveMapStateSoon_();
         }catch(e){}
+        scheduleViewportMarkerRender_();
       });
 
       if(currentLatLng){
@@ -2669,12 +2795,29 @@
     }
   }
 
-  function setCurrentLocation(lat, lng){
+  function animateCurrentMarker_(lat, lng){
+    if(!currentMarker) return;
+    if(gpsMarkerAnimation){ cancelAnimationFrame(gpsMarkerAnimation); gpsMarkerAnimation = null; }
+    var start = currentMarker.getLatLng();
+    var distance = haversineKm(start, {lat:lat, lng:lng}) * 1000;
+    var duration = Math.min(1200, Math.max(420, distance * 32));
+    var startedAt = performance.now();
+    function step(now){
+      var progress = Math.min(1, (now - startedAt) / duration);
+      var eased = progress < .5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      currentMarker.setLatLng([start.lat + (lat - start.lat) * eased, start.lng + (lng - start.lng) * eased]);
+      if(progress < 1) gpsMarkerAnimation = requestAnimationFrame(step);
+      else gpsMarkerAnimation = null;
+    }
+    gpsMarkerAnimation = requestAnimationFrame(step);
+  }
+
+  function setCurrentLocation(lat, lng, animate){
     currentLatLng = { lat:lat, lng:lng };
     if(!map) return;
 
     if(currentMarker){
-      try{ currentMarker.setLatLng([lat,lng]); }catch(e){}
+      try{ animate ? animateCurrentMarker_(lat, lng) : currentMarker.setLatLng([lat,lng]); }catch(e){}
       return;
     }
 
@@ -2728,6 +2871,127 @@
     var url = getOpenLink(place);
     if(!url){ showToast('ไม่มีลิงก์นำทาง'); return; }
     window.open(url, '_blank');
+  }
+
+  function clearWebRoute_(){
+    if(routeRequest){ try{ routeRequest.abort(); }catch(e){} routeRequest = null; }
+    if(routeLayer && map){ try{ map.removeLayer(routeLayer); }catch(e){} }
+    routeLayer = null;
+    activeWebRoute = null;
+    clearTimeout(routeArrivalTimer);
+    clearTimeout(routeRefreshTimer);
+    routeArrivalTimer = null;
+    routeRefreshTimer = null;
+    updateMapNavigationButtons_();
+  }
+
+  function hasActiveRouteFor_(place){
+    return !!(routeLayer && activeWebRoute && place && String(activeWebRoute.place && activeWebRoute.place.id) === String(place.id));
+  }
+
+  function updateMapNavigationButtons_(){
+    document.querySelectorAll('.map-nav[data-id]').forEach(function(button){
+      var place = PLACES.find(function(item){ return String(item.id) === String(button.getAttribute('data-id')); });
+      button.textContent = hasActiveRouteFor_(place) ? 'เปิด Maps' : 'นำทาง';
+    });
+  }
+
+  function showPlaceOnMap_(place){
+    if(location.hash !== '#map') location.hash = '#map';
+    else setPage('map');
+    return new Promise(function(resolve){
+      setTimeout(function(){
+        if(map) try{ map.invalidateSize(); }catch(e){}
+        if(map && hasLatLng_(place) && MAP_VIEWPORT_MARKERS.enabled){
+          try{
+            map.setView([Number(place.lat), Number(place.lng)], Math.max(map.getZoom(), MAP_VIEWPORT_MARKERS.focusZoom), { animate:false });
+          }catch(e){}
+        }
+        renderMap();
+        var marker = markerById.get(String(place && place.id));
+        if(marker){
+          try{
+            marker.openPopup();
+          }catch(e){}
+        }
+        resolve();
+      }, 120);
+    });
+  }
+
+  async function drawWebRoute_(place, isRefresh){
+    if(!map || !currentLatLng || !hasLatLng_(place)) return false;
+    if(routeRequest){ try{ routeRequest.abort(); }catch(e){} routeRequest = null; }
+    var routeState = { place:place, destination:{lat:Number(place.lat), lng:Number(place.lng)}, lastOrigin:{lat:currentLatLng.lat, lng:currentLatLng.lng}, lastRequestedAt:Date.now() };
+    activeWebRoute = routeState;
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    routeRequest = controller;
+    var origin = currentLatLng.lng + ',' + currentLatLng.lat;
+    var destination = place.lng + ',' + place.lat;
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + origin + ';' + destination + '?overview=full&geometries=geojson';
+    try{
+      if(!isRefresh) showToast('กำลังคำนวณเส้นทาง…');
+      var response = await fetch(url, { signal: controller ? controller.signal : undefined });
+      var result = await response.json();
+      if(routeRequest !== controller || activeWebRoute !== routeState || !result || result.code !== 'Ok' || !result.routes || !result.routes[0]) return false;
+      if(routeLayer){ try{ map.removeLayer(routeLayer); }catch(e){} routeLayer = null; }
+      routeLayer = L.geoJSON(result.routes[0].geometry, { style:{ color:'#0f8f83', weight:6, opacity:.88, lineCap:'round', lineJoin:'round' } }).addTo(map);
+      updateMapNavigationButtons_();
+      var bounds = routeLayer.getBounds();
+      if(!isRefresh && bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.16), { animate:true, duration:.35 });
+      var route = result.routes[0];
+      if(!isRefresh) showToast('เส้นทาง ' + (route.distance / 1000).toFixed(1) + ' กม. · ประมาณ ' + Math.max(1, Math.round(route.duration / 60)) + ' นาที');
+      return true;
+    }catch(e){
+      if(e && e.name === 'AbortError') return false;
+      console.warn('Route request failed', e);
+      showToast('ไม่สามารถคำนวณเส้นทางบนเว็บได้');
+      return false;
+    }finally{
+      if(routeRequest === controller) routeRequest = null;
+    }
+  }
+
+  function updateActiveWebRoute_(point){
+    var route = activeWebRoute;
+    if(!route || !point) return;
+    var destinationMeters = haversineKm(point, route.destination) * 1000;
+    if(destinationMeters <= 200){
+      if(!routeArrivalTimer){
+        routeArrivalTimer = setTimeout(function(){
+          if(activeWebRoute === route && currentLatLng && haversineKm(currentLatLng, route.destination) * 1000 <= 200){
+            clearWebRoute_();
+            showToast('ถึงปลายทางแล้ว · ซ่อนเส้นทาง');
+          }
+        }, 3000);
+      }
+      return;
+    }
+    if(routeArrivalTimer){ clearTimeout(routeArrivalTimer); routeArrivalTimer = null; }
+
+    var movedMeters = route.lastOrigin ? haversineKm(point, route.lastOrigin) * 1000 : Infinity;
+    if(movedMeters < 25 || Date.now() - route.lastRequestedAt < 7000 || routeRefreshTimer) return;
+    routeRefreshTimer = setTimeout(function(){
+      routeRefreshTimer = null;
+      if(activeWebRoute === route && currentLatLng) drawWebRoute_(route.place, true);
+    }, 350);
+  }
+
+  async function navigateToPlace_(place){
+    if(!place || !hasLatLng_(place)){ showToast('ร้านนี้ไม่มีพิกัดสำหรับนำทาง'); return; }
+    if(!SETTINGS.showWebRoute || hasActiveRouteFor_(place) || (currentLatLng && haversineKm(currentLatLng, {lat:place.lat, lng:place.lng}) * 1000 <= 200)){
+      // A direct Maps launch for another store must not leave its old web route visible.
+      if(activeWebRoute && !hasActiveRouteFor_(place)) clearWebRoute_();
+      openMaps(place);
+      return;
+    }
+    await showPlaceOnMap_(place);
+    if(!currentLatLng){
+      showToast('กำลังหาตำแหน่ง GPS ก่อนคำนวณเส้นทาง');
+      requestGPS();
+    }else{
+      await drawWebRoute_(place);
+    }
   }
 
   function editorPlaceLabel_(place){
@@ -3012,6 +3276,8 @@
   var REPORT_EMBED_PATCHED = false;
   var REPORT_COPY_HOOKED = false;
   var REPORT_PREFILL_ACKED = false;
+  var REPORT_OPEN_REQUEST_ID = 0;
+  var REPORT_CONFIG_WARMING = Object.create(null);
   var REPORT_NOTED_SAVE_WARNED = false;
   var WRITE_QUEUE = Promise.resolve();
   var PLACES_REVALIDATE_TIMER = null;
@@ -3141,7 +3407,7 @@
   }
 
   function reportNotedDefaults_(){
-    return { locationArea:'', issue:'', note:'', skuChecks:{}, summarySelections:{} };
+    return { locationArea:'', issue:'', note:'', skuChecks:{}, summarySelections:{}, promotionMediaSelections:{} };
   }
 
   function normalizeSkuChecksMap_(raw){
@@ -3185,6 +3451,10 @@
     }
 
     return out;
+  }
+
+  function normalizePromotionMediaSelectionsMap_(raw){
+    return normalizeSkuChecksMap_(raw);
   }
 
   function sameSummarySelections_(a, b){
@@ -3247,8 +3517,23 @@
     if(obj.note !== undefined && obj.note !== null) out.note = String(obj.note);
     out.skuChecks = normalizeSkuChecksMap_(obj.skuChecks || obj.checkedSkus || {});
     out.summarySelections = normalizeSummarySelectionsMap_(obj.summarySelections || obj.summaryChecks || obj.summaryTopics || {});
+    out.promotionMediaSelections = normalizePromotionMediaSelectionsMap_(obj.promotionMediaSelections || obj.promotionMedia || {});
 
     return out;
+  }
+
+  function hasStoredNote_(place){
+    var raw = place && place.noted;
+    if(raw === null || raw === undefined || raw === '') return false;
+    var obj = raw;
+    if(typeof raw === 'string'){
+      var text = String(raw).trim();
+      if(!text) return false;
+      try{ obj = JSON.parse(text); }catch(e){ return true; }
+    }
+    if(!obj || typeof obj !== 'object') return true;
+    if(obj.noted && typeof obj.noted === 'object') obj = obj.noted;
+    return Object.prototype.hasOwnProperty.call(obj, 'note');
   }
 
   function buildReportPrefillPayload_(place){
@@ -3257,18 +3542,20 @@
     var num = (place.number !== undefined && place.number !== null) ? String(place.number) : '';
     var nam = (place.account_name !== undefined && place.account_name !== null) ? String(place.account_name) : '';
     var noted = readPlaceNoted_(place);
+    var hasStoredNote = hasStoredNote_(place);
     var session = getReportSession_();
 
     var notedPayload = {
-      v: 3,
+      v: 4,
       locationArea: String(noted.locationArea || ''),
       issue: String(noted.issue || ''),
-      note: String(noted.note || ''),
       skuChecks: normalizeSkuChecksMap_(noted.skuChecks || {}),
-      summarySelections: normalizeSummarySelectionsMap_(noted.summarySelections || {})
+      summarySelections: normalizeSummarySelectionsMap_(noted.summarySelections || {}),
+      promotionMediaSelections: normalizePromotionMediaSelectionsMap_(noted.promotionMediaSelections || {})
     };
+    if(hasStoredNote) notedPayload.note = String(noted.note || '');
 
-    return {
+    var payload = {
       placeId: (place.id !== undefined && place.id !== null) ? String(place.id) : '',
       reportToken: session && session.token ? String(session.token) : '',
       sheetName: session && session.sheetName ? String(session.sheetName) : String(CURRENT_SHEET || ''),
@@ -3277,18 +3564,22 @@
       branchName: nam,
       locationArea: notedPayload.locationArea,
       issue: notedPayload.issue,
-      note: notedPayload.note,
       skuChecks: notedPayload.skuChecks,
       summarySelections: notedPayload.summarySelections,
+      promotionMediaSelections: notedPayload.promotionMediaSelections,
       noted: notedPayload
     };
+    if(hasStoredNote) payload.note = notedPayload.note;
+    return payload;
   }
 
-  function postReportPrefillMessage_(){
+  function postReportPrefillMessage_(payload){
     var win = getReportWin();
     if(!win) return false;
 
-    var msg = { type:'PT_PREFILL', payload: buildReportPrefillPayload_(REPORT_CTX) };
+    payload = payload || buildReportPrefillPayload_(REPORT_CTX);
+    if(typeof payload.forceConfigRefresh === 'undefined') payload.forceConfigRefresh = true;
+    var msg = { type:'PT_PREFILL', payload: payload };
     var targetOrigin = '*';
     try{
       if(location.origin && location.origin !== 'null') targetOrigin = location.origin;
@@ -3306,7 +3597,16 @@
     }
   }
 
+  function setReportOverlayLoading_(overlayId, loading){
+    var overlay = $(overlayId);
+    var modal = overlay && overlay.querySelector('.rep-modal');
+    if(modal) modal.classList.toggle('is-loading', !!loading);
+  }
+
   function openReport(place){
+    var openRequestId = ++REPORT_OPEN_REQUEST_ID;
+    var cachedConfigAtOpen = readReportConfigCache_(String(place && place.account || '').trim().toUpperCase());
+    var configRefresh = refreshReportConfigCache_(place && place.account);
     REPORT_CTX = place || null;
     REPORT_SESSION = buildReportSession_(place, CURRENT_SHEET);
     REPORT_PREFILL_ACKED = false;
@@ -3321,6 +3621,7 @@
       $('repSub').textContent = '—';
     }
 
+    setReportOverlayLoading_('repOverlay', true);
     $('repOverlay').classList.add('show');
     $('repOverlay').setAttribute('aria-hidden','false');
     document.body.classList.add('rep-open');
@@ -3334,14 +3635,36 @@
     var curOk = false;
     try{ curOk = !!curAbs && curAbs.indexOf('about:blank') !== 0 && curAbs.indexOf(targetAbs) === 0; }catch(e){ curOk = false; }
 
-    function afterFrameReady(){
+    async function afterFrameReady(){
       REPORT_FRAME_READY = true;
       tryTrimReportUI();
       patchReportEmbedStorageOnce();
       attachCopyHistoryHookOnce();
       clearRestrictedFieldsOnce();
-      postReportPrefillMessage_();
-      startPrefillLoop();
+      // Only a first-ever account load waits for the background cache download.
+      if(!cachedConfigAtOpen) await configRefresh;
+      if(openRequestId !== REPORT_OPEN_REQUEST_ID) return;
+      var win = getReportWin();
+      var payload = buildReportPrefillPayload_(REPORT_CTX);
+      payload.forceConfigRefresh = true;
+      payload.prefillRequestId = openRequestId;
+      var cachedConfig = readReportConfigCache_(String(REPORT_CTX && REPORT_CTX.account || '').trim().toUpperCase());
+      payload.cacheOnly = !!cachedConfig;
+      if(cachedConfig && cachedConfig.version !== null && cachedConfig.version !== undefined){
+        payload.reportConfigVersion = cachedConfig.version;
+      }
+      if(win && typeof win.__PT_APPLY_PREFILL === 'function'){
+        try{
+          await win.__PT_APPLY_PREFILL(payload);
+          if(openRequestId !== REPORT_OPEN_REQUEST_ID) return;
+          REPORT_PREFILL_ACKED = true;
+          setReportOverlayLoading_('repOverlay', false);
+          return;
+        }catch(e){}
+      }
+      if(openRequestId !== REPORT_OPEN_REQUEST_ID) return;
+      postReportPrefillMessage_(payload);
+      startPrefillLoop(payload);
     }
 
     if(!curOk){
@@ -3368,6 +3691,7 @@
     $('repOverlay').classList.remove('show');
     $('repOverlay').setAttribute('aria-hidden','true');
     document.body.classList.remove('rep-open');
+    setReportOverlayLoading_('repOverlay', true);
   }
 
   $('repClose').addEventListener('click', closeReport);
@@ -3383,13 +3707,15 @@
 
     // Reboot the history-only document so it reads the latest local report history.
     // This deliberately avoids the slow store API refresh used by the map page.
+    setReportOverlayLoading_('historyOverlay', true);
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('rep-open');
     frame.dataset.historyRefreshId = refreshId;
     frame.onload = function(){
       if(frame.dataset.historyRefreshId !== refreshId) return;
       frame.onload = null;
-      overlay.classList.add('show');
-      overlay.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('rep-open');
+      setReportOverlayLoading_('historyOverlay', false);
     };
 
     if(frame.dataset.historyLoaded === '1'){
@@ -3408,6 +3734,7 @@
     $('historyOverlay').classList.remove('show');
     $('historyOverlay').setAttribute('aria-hidden', 'true');
     document.body.classList.remove('rep-open');
+    setReportOverlayLoading_('historyOverlay', true);
   }
 
   $('mapHistoryFab').addEventListener('click', openReportHistory);
@@ -3436,12 +3763,21 @@
     }catch(e){}
 
     if(msg.type === 'PT_PREFILL_ACK'){
+      var activeToken = REPORT_SESSION && REPORT_SESSION.token ? String(REPORT_SESSION.token) : '';
+      if(msg.reportToken && activeToken && String(msg.reportToken) !== activeToken) return;
+      if(Number(msg.prefillRequestId) !== REPORT_OPEN_REQUEST_ID) return;
       REPORT_PREFILL_ACKED = true;
+      setReportOverlayLoading_('repOverlay', false);
       return;
     }
 
     if(msg.type === 'PT_REPORT_COPIED'){
       handleReportCopiedMessage_(msg.payload || {});
+      return;
+    }
+
+    if(msg.type === 'PT_REPORT_SAVED'){
+      handleReportSavedMessage_(msg.payload || {});
       return;
     }
   });
@@ -3586,7 +3922,7 @@
     });
   }
 
-  function prefillReportOnce(){
+  function prefillReportOnce(payload){
     var place = REPORT_CTX;
     if(!place) return false;
 
@@ -3600,7 +3936,7 @@
     var num = (place.number !== undefined && place.number !== null) ? String(place.number) : '';
     var nam = (place.account_name !== undefined && place.account_name !== null) ? String(place.account_name) : '';
     var noted = readPlaceNoted_(place);
-    var fullPayload = buildReportPrefillPayload_(place);
+    var fullPayload = payload || buildReportPrefillPayload_(place);
 
     if(typeof win.__PT_APPLY_PREFILL === 'function'){
       try{
@@ -3645,7 +3981,7 @@
     return !!(okA || okN || okS || okL || okI || okT);
   }
 
-  function startPrefillLoop(){
+  function startPrefillLoop(payload){
     var tries = 0;
     var maxTries = 50;
     var interval = 120;
@@ -3653,13 +3989,13 @@
     var t = setInterval(function(){
       tries++;
       if(!REPORT_PREFILL_ACKED && tries <= 12){
-        postReportPrefillMessage_();
+        postReportPrefillMessage_(payload);
       }
       tryTrimReportUI();
       patchReportEmbedStorageOnce();
       attachCopyHistoryHookOnce();
 
-      var ok = prefillReportOnce();
+      var ok = prefillReportOnce(payload);
       if(ok || tries >= maxTries){
         clearInterval(t);
         if(!ok){ showToast('Prefill ไม่เจอช่องใน Report.html (ปล่อยว่างไว้)'); }
@@ -3891,14 +4227,20 @@
     placesLayer.clearLayers();
     markerById.clear();
 
-    var items = filteredPlaces(true).filter(hasLatLng_);
-    var visitedIcon = new L.Icon.Default({ className: 'marker-visited' });
-
+    var allItems = filteredPlaces(true).filter(hasLatLng_);
+    var items = allItems;
+    if(MAP_VIEWPORT_MARKERS.enabled){
+      var bounds = map.getBounds();
+      if(bounds && bounds.isValid()){
+        bounds = bounds.pad(MAP_VIEWPORT_MARKERS.padding);
+        items = items.filter(function(place){ return bounds.contains([Number(place.lat), Number(place.lng)]); });
+      }
+    }
     items.forEach(function(p){
       var link = getOpenLink(p);
 
       var navHtml = link
-        ? ('<a class="map-link" href="' + escapeHtml(link) + '" target="_blank" rel="noopener">นำทาง</a>')
+        ? ('<button class="map-link map-nav" type="button" data-id="' + escapeHtml(p.id) + '">' + (hasActiveRouteFor_(p) ? 'เปิด Maps' : 'นำทาง') + '</button>')
         : ('<button class="map-link disabled" type="button" disabled>นำทาง</button>');
 
       var reportHtml =
@@ -3926,18 +4268,32 @@
         '<div class="map-actions">' + navHtml + reportHtml + doneHtml + '</div>' + editHtml +
         '</div>';
 
-      var markerOptions = p.visited ? { icon: visitedIcon } : {};
-      var mk = L.marker([p.lat, p.lng], markerOptions).addTo(placesLayer).bindPopup(popup, {
+      var markerOptions = MAP_MARKER_RENDERER.mode === 'canvas'
+        ? {
+          renderer: placesCanvasRenderer,
+          radius: p.visited ? 8 : 9,
+          color: p.visited ? '#64748b' : '#1677d2',
+          weight: 3,
+          opacity: .96,
+          fillColor: p.visited ? '#94a3b8' : '#2f8df4',
+          fillOpacity: .94
+        }
+        : (p.visited ? { icon: new L.Icon.Default({ className: 'marker-visited' }) } : {});
+      var mk = MAP_MARKER_RENDERER.mode === 'canvas'
+        ? L.circleMarker([p.lat, p.lng], markerOptions)
+        : L.marker([p.lat, p.lng], markerOptions);
+      mk.addTo(placesLayer).bindPopup(popup, {
         closeButton:false,
         closeOnClick:true
       });
+      mk.on('popupopen', function(){ refreshReportConfigCache_(p.account); });
       markerById.set(String(p.id), mk);
     });
 
     if(!mapState.userInteracted && !mapState.autoFitted){
       var pts = [];
       if(currentLatLng) pts.push([currentLatLng.lat, currentLatLng.lng]);
-      items.forEach(function(p){ pts.push([p.lat, p.lng]); });
+      allItems.forEach(function(p){ pts.push([p.lat, p.lng]); });
       if(pts.length){
         try{ map.fitBounds(L.latLngBounds(pts).pad(0.15)); }catch(e){}
         mapState.autoFitted = true;
@@ -3949,9 +4305,18 @@
     id = String(id);
     var mk = markerById.get(id);
     if(mk){
-      try{ mk.remove(); }catch(e){}
+      try{
+        if(placesLayer && typeof placesLayer.removeLayer === 'function') placesLayer.removeLayer(mk);
+        else mk.remove();
+      }catch(e){}
       markerById.delete(id);
     }
+  }
+
+  function scheduleViewportMarkerRender_(){
+    if(!MAP_VIEWPORT_MARKERS.enabled || !map) return;
+    clearTimeout(viewportMarkerTimer);
+    viewportMarkerTimer = setTimeout(function(){ renderMap(); }, 100);
   }
 
   function cacheWrite_(payload, sheetName){
@@ -4147,14 +4512,16 @@
     if(src && src.note !== undefined && src.note !== null) out.note = String(src.note);
     out.skuChecks = normalizeSkuChecksMap_(src ? (src.skuChecks || src.checkedSkus || {}) : {});
     out.summarySelections = normalizeSummarySelectionsMap_(src ? (src.summarySelections || src.summaryChecks || src.summaryTopics || {}) : {});
+    out.promotionMediaSelections = normalizePromotionMediaSelectionsMap_(src ? (src.promotionMediaSelections || src.promotionMedia || {}) : {});
 
     var rec = {
-      v: 3,
+      v: 4,
       locationArea: out.locationArea,
       issue: out.issue,
       note: out.note,
       skuChecks: out.skuChecks,
-      summarySelections: out.summarySelections
+      summarySelections: out.summarySelections,
+      promotionMediaSelections: out.promotionMediaSelections
     };
 
     if(payload.reportDateISO){
@@ -4227,14 +4594,12 @@
     }
   }
 
-  function handleReportCopiedMessage_(payload){
+  function persistReportNotedFromPayload_(payload){
     payload = payload || {};
-    ensureHistoryExistsFromPayload_(payload);
-
     var ctx = resolveSafeReportCopyContext_(payload);
     if(!ctx){
       console.warn('Skipped report->sheet sync because popup context no longer matches the active report session.', payload);
-      return;
+      return false;
     }
 
     var placeId = ctx.placeId;
@@ -4244,13 +4609,24 @@
     try{
       notedStr = JSON.stringify(rec);
     }catch(e){
-      return;
+      return false;
     }
 
     updateLocalNotedState_(placeId, notedStr, sheetName);
 
     // Fire-and-forget: keep copy flow smooth even before backend is updated.
     saveNotedToApiSilent_(placeId, notedStr, sheetName);
+    return true;
+  }
+
+  function handleReportCopiedMessage_(payload){
+    payload = payload || {};
+    ensureHistoryExistsFromPayload_(payload);
+    persistReportNotedFromPayload_(payload);
+  }
+
+  function handleReportSavedMessage_(payload){
+    persistReportNotedFromPayload_(payload);
   }
 
   function renderFromCacheIfAny_(sheetName){
@@ -4468,9 +4844,23 @@
 
     var act = btn.getAttribute('data-act');
 
-    if(act === 'nav'){ openMaps(place); return; }
+    if(act === 'nav'){ navigateToPlace_(place); return; }
     if(act === 'report'){ openReport(place); return; }
     if(act === 'done'){ confirmAndMarkVisited(place); return; }
+  }, true);
+
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.map-nav') : null;
+    if(!btn) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    var id = btn.getAttribute('data-id');
+    var place = PLACES.find(function(x){ return String(x.id) === String(id); });
+    if(!place){ showToast('ไม่พบรายการสำหรับปุ่มนำทาง'); return; }
+
+    navigateToPlace_(place);
   }, true);
 
   document.addEventListener('click', function(ev){
@@ -4577,31 +4967,72 @@
     ev.stopPropagation();
   }, true);
 
-  function requestGPS(){
+  function applyGpsPosition_(pos, realtime){
+    var lat = pos.coords.latitude;
+    var lng = pos.coords.longitude;
+    var next = {lat:lat, lng:lng};
+    var movedMeters = currentLatLng ? haversineKm(currentLatLng, next) * 1000 : Infinity;
+    if(realtime && movedMeters < 3) return;
+
+    if(map) setCurrentLocation(lat, lng, !!realtime);
+    else currentLatLng = next;
+
+    $('gpsPill').textContent = realtime ? 'GPS: ติดตามอยู่' : 'GPS: พร้อม';
+    if(activeWebRoute) updateActiveWebRoute_(next);
+    if($('sortMode').value === 'nearest' && (!realtime || Date.now() - lastRealtimeRenderAt > 2500)){
+      lastRealtimeRenderAt = Date.now();
+      renderList();
+      if(map) renderMap();
+    }else if(!realtime && map){
+      renderMap();
+    }
+  }
+
+  function stopRealtimeGPS_(){
+    if(gpsWatchId !== null && navigator.geolocation){
+      try{ navigator.geolocation.clearWatch(gpsWatchId); }catch(e){}
+    }
+    gpsWatchId = null;
+  }
+
+  function startRealtimeGPS_(){
+    if(!navigator.geolocation){
+      $('gpsPill').textContent = 'GPS: ไม่รองรับ';
+      return;
+    }
+    if(gpsWatchId !== null){ $('gpsPill').textContent = 'GPS: ติดตามอยู่'; return; }
+    $('gpsPill').textContent = 'กำลังเริ่มติดตาม GPS…';
+    gpsWatchId = navigator.geolocation.watchPosition(function(pos){
+      applyGpsPosition_(pos, true);
+    }, function(err){
+      console.warn(err);
+      gpsWatchId = null;
+      $('gpsPill').textContent = 'GPS: ปฏิเสธ/ผิดพลาด';
+    }, { enableHighAccuracy:true, timeout:15000, maximumAge:3000 });
+  }
+
+  function applyGpsMode_(){
+    if(SETTINGS && SETTINGS.gpsMode === 'realtime') startRealtimeGPS_();
+    else { stopRealtimeGPS_(); requestGPSOnce_(); }
+  }
+
+  function requestGPSOnce_(){
     if(!navigator.geolocation){
       $('gpsPill').textContent = 'GPS: ไม่รองรับ';
       return;
     }
     $('gpsPill').textContent = 'กำลังหา GPS…';
     navigator.geolocation.getCurrentPosition(function(pos){
-      var lat = pos.coords.latitude;
-      var lng = pos.coords.longitude;
-
-      if(map) setCurrentLocation(lat, lng);
-      else currentLatLng = {lat:lat, lng:lng};
-
-      $('gpsPill').textContent = 'GPS: พร้อม';
-
-      if($('sortMode').value === 'nearest'){
-        renderList();
-        if(map) renderMap();
-      }else{
-        if(map) renderMap();
-      }
+      applyGpsPosition_(pos, false);
     }, function(err){
       console.warn(err);
       $('gpsPill').textContent = 'GPS: ปฏิเสธ/ผิดพลาด';
     }, { enableHighAccuracy:true, timeout:10000, maximumAge:15000 });
+  }
+
+  function requestGPS(){
+    if(SETTINGS && SETTINGS.gpsMode === 'realtime') startRealtimeGPS_();
+    else requestGPSOnce_();
   }
 
   async function onResetAll(){
