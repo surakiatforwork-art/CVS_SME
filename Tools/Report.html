@@ -618,6 +618,10 @@
       <div class="summaryTopicHint">ติ๊กเฉพาะร้านที่ต้องการให้ไปอยู่ในสรุปงานท้ายวันแบบแยกหมวด</div>
       <div id="summaryTopicList" class="summaryTopicList"></div>
 
+      <div class="label">🪧สื่อโปรโมชั่น</div>
+      <div class="summaryTopicHint">ติ๊กเฉพาะสื่อโปรโมชั่นที่ติดตั้งในสาขานี้</div>
+      <div id="promotionMediaList" class="summaryTopicList"></div>
+
       <div class="grid2">
         <div>
           <div class="label">⛔ ปัญหาที่พบ</div>
@@ -625,8 +629,8 @@
         </div>
         <div>
           <div class="label">หมายเหตุ</div>
-          <textarea id="note" class="field" placeholder="ใช้ช่องนี้สำหรับสื่อโปรโมชั่น ป้ายสินค้าใหม่ ป้ายขายดี Sticker ลิซ่า และชั้นวางสินค้า"></textarea>
-          <div class="mini">ตัวอย่าง: &#10;🪧สื่อโปรโมชั่น ...&#10;🪧ป้ายสินค้าใหม่ ...&#10;⭐ Sticker ลิซ่า : ✔️&#10;🗄️ชั้นวางสินค้า ...</div>
+          <textarea id="note" class="field" placeholder="ใช้ช่องนี้สำหรับป้ายสินค้าใหม่ ป้ายขายดี Sticker ลิซ่า และชั้นวางสินค้า"></textarea>
+          <div class="mini">ตัวอย่าง: &#10;🪧ป้ายสินค้าใหม่ ...&#10;⭐ Sticker ลิซ่า : ✔️&#10;🗄️ชั้นวางสินค้า ...</div>
         </div>
       </div>
     </div>
@@ -654,7 +658,7 @@
           <button class="btn primary" id="btnHistorySummary">🧾 สรุปยอด (จากที่ติ๊ก)</button>
           <button class="btn soft" id="btnSelectAll">เลือกทั้งหมด</button>
           <button class="btn" id="btnToggleAll">ดูทั้งหมด</button>
-          <button class="btn danger" id="btnClearAll">ล้างประวัติทั้งหมด</button>
+          <button class="btn danger" id="btnClearAll">ล้างประวัติ</button>
         </div>
       </div>
 
@@ -701,6 +705,7 @@
   "use strict";
 
   const QUERY = new URLSearchParams(location.search);
+  const REPORT_CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbw91N5J4z1Jjn0rZz8qnn-ZFmP6bYJ2IZaKrOXrDaTj3aJoAvGJCVJBy982T_pXilNS/exec";
   const EMBED = QUERY.get("embed") === "1";
   const HISTORY_MODE = QUERY.get("history") === "1" || location.hash === "#history";
 
@@ -708,7 +713,9 @@
   // Popup and the standalone page have different drafts, so opening a store report never clears the standalone draft.
   const STORE_FORM = EMBED ? "PT_REPORT_FORM_EMBED_V1" : "PT_REPORT_FORM_DIRECT_V2";
   const STORE_HISTORY = "PT_REPORT_HISTORY_V1";
+  const STORE_HISTORY_DELETED = "PT_REPORT_HISTORY_DELETED_V1";
   const STORE_UI = "PT_REPORT_UI_V1";
+  const STORE_REPORT_CONFIG_CACHE = "PT_REPORT_CONFIG_CACHE_V1";
   const STORE_SKU_GLOBAL = "PT_REPORT_SKU_GLOBAL_V1";
   const SKU_GLOBAL_PRESET_VERSION = "2026-07-14-order-v2";
   const STORAGE_CACHE_PREFIX = "PT_GBKK_PLACES_CACHE_";
@@ -729,11 +736,6 @@
     "- สาขาติดป้ายสื่อโปรโมชั่นเรียบร้อย"
   ].join("\n");
   const DEFAULT_NOTE_TEMPLATE = [
-    "🪧สื่อโปรโมชั่น",
-    "⭐SME โฟมขาวไวท์ 1oz : ",
-    "⭐SME โฟโฟมเขียวเบบี้เฟช.5oz : ",
-    "⭐SME ครีมพลัสไวท์ 10 g : ",
-    "",
     "🪧ป้ายสินค้าใหม่",
     "- งดติดชั่วคราว",
     "",
@@ -761,7 +763,7 @@
     "สถานที่ใกล้ขนส่ง"
   ];
 
-  const SUMMARY_TOPICS = [
+  let SUMMARY_TOPICS = [
     { id: "brush_advanced_b1g1", label: "⛔สรุปแปรงแอดวานซ์ 1แถม1" },
     { id: "brush_pack3_b1g1", label: "⛔สรุปแปรงแพ็ค3 1แถม1" },
     { id: "acne_scar_5g_b1g1", label: "⛔สรุปแอคเน่สการ์5G 1แถม1" },
@@ -771,7 +773,17 @@
     { id: "dentiste_max_45g_b1g1", label: "⛔สรุปเดนทิสเต้ MAX 45G 1แถม1" }
   ];
 
-  const SKU_ITEMS = [
+  let PROMOTION_MEDIA_ITEMS = [
+    { id: "sme_spot_clear_foam_40ml", label: "⭐SME สปอตเคลียร์โฟม40มล." },
+    { id: "sme_baby_face_gel_1_5oz", label: "⭐SME เบบี้เฟชเจลล้างหน้า 1.5oz" },
+    { id: "den_advanced_care_toothbrush", label: "⭐DEN แปรงสีฟันแอดวานซ์แคร์" },
+    { id: "sme_sun_zero_feel_sachet", label: "⭐SME สมูทอี ซัน ซีโร่ ฟีล(ซอง)" },
+    { id: "sme_acne_sun_5g_sachet", label: "⭐ SME สมูทอีแอคเน่ซัน 5g.(ซอง )" },
+    { id: "sme_white_cream_5g_sachet", label: "⭐SME ไวท์ครีม 5G. (ซอง)" },
+    { id: "sme_gold_cream_5g_sachet", label: "⭐SME โกลครีม 5G. (ซอง)" }
+  ];
+
+  let SKU_ITEMS = [
     { id: "sme_foam_baby_face_2oz", label: "SME โฟมเบบี้เฟช 2oz", family: "SME" },
     { id: "sme_foam_green_baby_face_1_2oz", label: "SME โฟมเขียวเบบี้เฟช 1.2oz", family: "SME" },
     { id: "sme_baby_face_gel_1_5oz", label: "SME เบบี้เฟชเจลล้างหน้า 1.5oz", family: "SME" },
@@ -884,9 +896,9 @@
     summary: "https://line.me/R/nv/chat/"
   };
 
-  const SKU_ITEM_MAP = new Map(SKU_ITEMS.map((item) => [item.id, item]));
+  let SKU_ITEM_MAP = new Map(SKU_ITEMS.map((item) => [item.id, item]));
   // The check form retains the master-list order. 7-ELEVEN uses this separate order only in copied reports.
-  const REPORT_COPY_LAYOUTS = {
+  let REPORT_COPY_LAYOUTS = {
     "7-ELEVEN": [
       {
         heading: "📍สินค้าโฟม SMOOTHE",
@@ -957,7 +969,7 @@
       }
     ]
   };
-  const DEFAULT_SKU_GLOBAL_FLAGS = {
+  let DEFAULT_SKU_GLOBAL_FLAGS = {
     sme_foam_green_baby_face_1_2oz: MONTHLY_FLAG_FOCUS,
     sme_white_foam_1oz: MONTHLY_FLAG_FOCUS,
     sme_green_cream_10g: MONTHLY_FLAG_FOCUS,
@@ -986,6 +998,26 @@
     sme_baby_face_acne_5_detoxify_new: MONTHLY_FLAG_FOCUS,
     sme_acne_cleansing_serum_80ml_new: MONTHLY_FLAG_FOCUS
   };
+
+  // Used only by the private Admin page to import the current built-in catalog once.
+  window.__PT_REPORT_CONFIG_SEED = {
+    skuItems: SKU_ITEMS,
+    summaryTopics: SUMMARY_TOPICS,
+    promotionMediaItems: PROMOTION_MEDIA_ITEMS,
+    copyLayouts: REPORT_COPY_LAYOUTS,
+    defaultFlags: DEFAULT_SKU_GLOBAL_FLAGS
+  };
+
+  const BUILTIN_REPORT_CONFIG = {
+    skuItems: JSON.parse(JSON.stringify(SKU_ITEMS)),
+    summaryTopics: JSON.parse(JSON.stringify(SUMMARY_TOPICS)),
+    promotionMediaItems: JSON.parse(JSON.stringify(PROMOTION_MEDIA_ITEMS)),
+    copyLayouts: JSON.parse(JSON.stringify(REPORT_COPY_LAYOUTS)),
+    defaultFlags: JSON.parse(JSON.stringify(DEFAULT_SKU_GLOBAL_FLAGS))
+  };
+  let reportConfigLoading = null;
+  let reportConfigLoadingAccount = "";
+  let reportConfigRequestId = 0;
 
   function getLineUrlByAccount(accountValue){
     const a = (accountValue || "").trim().toUpperCase();
@@ -1024,6 +1056,7 @@
   const skuBoard = $("skuBoard");
   const skuListAll = $("skuListAll");
   const summaryTopicList = $("summaryTopicList");
+  const promotionMediaList = $("promotionMediaList");
 
   const histList = $("histList");
   const histCount = $("histCount");
@@ -1043,6 +1076,7 @@
   const modalNo = $("modalNo");
 
   let history = [];
+  let deletedHistoryIds = new Set();
   let selectedIds = new Set();
   let showAllHistory = false;
   let modalOnYes = null;
@@ -1153,7 +1187,8 @@
       issue: DEFAULT_ISSUE_TEMPLATE,
       note: DEFAULT_NOTE_TEMPLATE,
       skuChecks: {},
-      summarySelections: {}
+      summarySelections: {},
+      promotionMediaSelections: {}
     };
   }
 
@@ -1164,7 +1199,7 @@
 
   function noteValueOrDefault(value){
     const text = String(value ?? "");
-    return text.trim() ? text : DEFAULT_NOTE_TEMPLATE;
+    return text.trim() ? stripPromotionMediaSection(text) : DEFAULT_NOTE_TEMPLATE;
   }
 
   function normalizeSkuChecks(raw){
@@ -1208,6 +1243,34 @@
     return out;
   }
 
+  function normalizePromotionMediaSelections(raw){
+    const out = {};
+    if (!raw || typeof raw !== "object") return out;
+
+    if (Array.isArray(raw)){
+      for (const id of raw){
+        if (typeof id !== "string") continue;
+        if (!PROMOTION_MEDIA_ITEMS.some((item) => item.id === id)) continue;
+        out[id] = true;
+      }
+      return out;
+    }
+
+    for (const item of PROMOTION_MEDIA_ITEMS){
+      out[item.id] = !!raw[item.id];
+    }
+    return out;
+  }
+
+  function stripPromotionMediaSection(value){
+    const lines = String(value ?? "").replace(/\r\n?/g, "\n").split("\n");
+    const start = lines.findIndex((line) => line.trim() === "🪧สื่อโปรโมชั่น");
+    if (start < 0) return lines.join("\n").trim();
+    const end = lines.findIndex((line, index) => index > start && line.trim() === "🪧ป้ายสินค้าใหม่");
+    if (end < 0) return lines.join("\n").trim();
+    return [...lines.slice(0, start), ...lines.slice(end)].join("\n").replace(/^\s+|\s+$/g, "");
+  }
+
   function normalizeNotedState(raw){
     const out = defaultNotedState();
     if (!raw || typeof raw !== "object") return out;
@@ -1221,11 +1284,15 @@
       out.issue = issueValueOrDefault(source.issue);
     }
     if (source.note !== undefined && source.note !== null){
-      out.note = noteValueOrDefault(source.note);
+      const text = String(source.note);
+      out.note = text.trim() ? stripPromotionMediaSection(text) : "";
     }
     out.skuChecks = normalizeSkuChecks(source.skuChecks || source.checkedSkus || {});
     out.summarySelections = normalizeSummarySelections(
       source.summarySelections || source.summaryChecks || source.summaryTopics || {}
+    );
+    out.promotionMediaSelections = normalizePromotionMediaSelections(
+      source.promotionMediaSelections || source.promotionMedia || {}
     );
 
     return out;
@@ -1295,8 +1362,18 @@
     return out;
   }
 
+  function loadDeletedHistoryIds(){
+    const stored = loadJSON(STORE_HISTORY_DELETED, []);
+    return new Set(Array.isArray(stored) ? stored.map((id) => String(id)) : []);
+  }
+
+  function saveDeletedHistoryIds(){
+    saveJSON(STORE_HISTORY_DELETED, Array.from(deletedHistoryIds));
+  }
+
   function readStoredHistory(){
-    return compactHistoryList(loadJSON(STORE_HISTORY, []));
+    return compactHistoryList(loadJSON(STORE_HISTORY, []))
+      .filter((item) => !deletedHistoryIds.has(item.id));
   }
 
   function mergeHistoryLists(...lists){
@@ -1306,6 +1383,7 @@
       for (const raw of list){
         const item = normalizeHistoryEntry(raw);
         if (!item) continue;
+        if (deletedHistoryIds.has(item.id)) continue;
         all.push(item);
       }
     }
@@ -1437,6 +1515,188 @@
       `;
       summaryTopicList.appendChild(row);
     }
+  }
+
+  function renderPromotionMedia(){
+    promotionMediaList.innerHTML = "";
+    for (const item of PROMOTION_MEDIA_ITEMS){
+      const row = document.createElement("label");
+      row.className = "summaryTopicItem";
+      row.innerHTML = `
+        <input type="checkbox" data-promotion-media-id="${escapeHtmlAttr(item.id)}" aria-label="${escapeHtmlAttr(item.label)}">
+        <span class="summaryTopicLabel">${escapeHtml(item.label)}</span>
+      `;
+      promotionMediaList.appendChild(row);
+    }
+  }
+
+  function reportConfigJsonp(accountName){
+    return new Promise((resolve, reject) => {
+      const callback = `__ptReportConfig_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const url = new URL(REPORT_CONFIG_API_URL);
+      url.searchParams.set("action", "getReportConfig");
+      url.searchParams.set("account", accountName);
+      url.searchParams.set("callback", callback);
+      const script = document.createElement("script");
+      const timer = setTimeout(() => finish(new Error("หมดเวลารอ config รายงาน")), 30000);
+      function finish(error, value){
+        clearTimeout(timer);
+        delete window[callback];
+        script.remove();
+        error ? reject(error) : resolve(value);
+      }
+      window[callback] = (value) => finish(null, value);
+      script.onerror = () => finish(new Error("โหลด config รายงานไม่สำเร็จ"));
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
+  }
+
+  function reportConfigMetaJsonp(accountName){
+    return new Promise((resolve, reject) => {
+      const callback = `__ptReportConfigMeta_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const url = new URL(REPORT_CONFIG_API_URL);
+      url.searchParams.set("action", "getReportConfigMeta");
+      url.searchParams.set("account", accountName);
+      url.searchParams.set("callback", callback);
+      const script = document.createElement("script");
+      const timer = setTimeout(() => finish(new Error("หมดเวลารอสถานะ config รายงาน")), 15000);
+      function finish(error, value){
+        clearTimeout(timer);
+        delete window[callback];
+        script.remove();
+        error ? reject(error) : resolve(value);
+      }
+      window[callback] = (value) => finish(null, value);
+      script.onerror = () => finish(new Error("โหลดสถานะ config รายงานไม่สำเร็จ"));
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
+  }
+
+  function readReportConfigCache(accountName){
+    try{
+      const all = JSON.parse(localStorage.getItem(STORE_REPORT_CONFIG_CACHE) || "{}");
+      const cached = all[safeText(accountName).trim().toUpperCase()];
+      return cached && cached.result && Array.isArray(cached.result.items) ? cached : null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function writeReportConfigCache(accountName, result){
+    try{
+      const all = JSON.parse(localStorage.getItem(STORE_REPORT_CONFIG_CACHE) || "{}");
+      all[safeText(accountName).trim().toUpperCase()] = { version: result.version, result };
+      localStorage.setItem(STORE_REPORT_CONFIG_CACHE, JSON.stringify(all));
+    }catch(_){}
+  }
+
+  async function getLatestReportConfig(accountName, verifiedVersion = null, cacheOnly = false){
+    const cached = readReportConfigCache(accountName);
+    if (cached && (cacheOnly || (verifiedVersion !== null && Number(cached.version) === Number(verifiedVersion)))){
+      return { result: cached.result, fromCache: true };
+    }
+    if (cacheOnly) throw new Error("ไม่พบ config ในเครื่อง");
+    try{
+      const meta = await reportConfigMetaJsonp(accountName);
+      if (!meta || !meta.ok) throw new Error((meta && meta.message) || "โหลดสถานะ config ไม่สำเร็จ");
+      if (cached && Number(cached.version) === Number(meta.version)){
+        return { result: cached.result, fromCache: true };
+      }
+      const result = await reportConfigJsonp(accountName);
+      if (!result || !result.ok) throw new Error((result && result.message) || "โหลด config ไม่สำเร็จ");
+      writeReportConfigCache(accountName, result);
+      return { result, fromCache: false };
+    }catch(error){
+      if (cached) return { result: cached.result, fromCache: true, offline: true };
+      throw error;
+    }
+  }
+
+  function restoreBuiltinReportConfig(){
+    SKU_ITEMS = JSON.parse(JSON.stringify(BUILTIN_REPORT_CONFIG.skuItems));
+    SUMMARY_TOPICS = JSON.parse(JSON.stringify(BUILTIN_REPORT_CONFIG.summaryTopics));
+    PROMOTION_MEDIA_ITEMS = JSON.parse(JSON.stringify(BUILTIN_REPORT_CONFIG.promotionMediaItems));
+    REPORT_COPY_LAYOUTS = JSON.parse(JSON.stringify(BUILTIN_REPORT_CONFIG.copyLayouts));
+    DEFAULT_SKU_GLOBAL_FLAGS = JSON.parse(JSON.stringify(BUILTIN_REPORT_CONFIG.defaultFlags));
+    SKU_ITEM_MAP = new Map(SKU_ITEMS.map((item) => [item.id, item]));
+  }
+
+  function applyRemoteReportConfig(accountName, records){
+    // A saved record set is authoritative, even when every item is disabled.
+    // Only accounts with no records at all should fall back to the built-in catalog.
+    if (!Array.isArray(records) || !records.length) return false;
+    const active = (records || []).filter((item) => item && item.active !== false);
+    const skuRecordsForCopy = active.filter((item) => item.kind === "sku").sort((a, b) => a.sort - b.sort);
+    const skuRecords = [...skuRecordsForCopy].sort((a, b) => {
+      const aSort = Number((a.data || {}).formSort) || Number(a.sort) || 0;
+      const bSort = Number((b.data || {}).formSort) || Number(b.sort) || 0;
+      return aSort - bSort || a.sort - b.sort;
+    });
+    SKU_ITEMS = skuRecords.map((item) => ({
+      id: String(item.id), label: String((item.data || {}).label || item.id),
+      family: (item.data || {}).family === "DEN" ? "DEN" : "SME", accounts: [accountName],
+      category: String((item.data || {}).category || "📍สินค้าอื่นๆ"), sort: Number((item.data || {}).formSort) || Number(item.sort) || 0
+    }));
+    SUMMARY_TOPICS = active.filter((item) => item.kind === "summary").sort((a, b) => a.sort - b.sort)
+      .map((item) => ({ id: String(item.id), label: String((item.data || {}).label || item.id) }));
+    PROMOTION_MEDIA_ITEMS = active.filter((item) => item.kind === "promotion").sort((a, b) => a.sort - b.sort)
+      .map((item) => ({ id: String(item.id), label: String((item.data || {}).label || item.id) }));
+    DEFAULT_SKU_GLOBAL_FLAGS = {};
+    for (const item of skuRecordsForCopy){
+      const flag = normalizeMonthlyFlag((item.data || {}).defaultFlag);
+      if (flag) DEFAULT_SKU_GLOBAL_FLAGS[item.id] = flag;
+    }
+    const groups = new Map();
+    for (const item of skuRecordsForCopy){
+      const category = String((item.data || {}).category || "📍สินค้าอื่นๆ");
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(String(item.id));
+    }
+    REPORT_COPY_LAYOUTS = { [safeText(accountName).trim().toUpperCase()]: [...groups.entries()].map(([heading, ids]) => ({ heading, ids })) };
+    SKU_ITEM_MAP = new Map(SKU_ITEMS.map((item) => [item.id, item]));
+    return true;
+  }
+
+  async function loadOnlineReportConfig(accountName = account.value, forceRefresh = false, preservedState = null, verifiedVersion = null, cacheOnly = false){
+    const normalized = safeText(accountName).trim();
+    const savedSkuChecks = preservedState ? (preservedState.skuChecks || {}) : collectSkuChecksFromDom();
+    const savedSummaries = preservedState ? (preservedState.summarySelections || {}) : collectSummarySelectionsFromDom();
+    const savedPromotions = preservedState ? (preservedState.promotionMediaSelections || {}) : collectPromotionMediaSelectionsFromDom();
+    if (!normalized){
+      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      updatePreview();
+      return null;
+    }
+    if (reportConfigLoading && reportConfigLoadingAccount === normalized && !forceRefresh) return reportConfigLoading;
+    const requestId = ++reportConfigRequestId;
+    reportConfigLoading = getLatestReportConfig(normalized, verifiedVersion, cacheOnly).then(({ result, fromCache, offline }) => {
+      if (requestId !== reportConfigRequestId) return false;
+      restoreBuiltinReportConfig();
+      if (!result || !result.ok) throw new Error((result && result.message) || "โหลด config ไม่สำเร็จ");
+      applyRemoteReportConfig(normalized, result.items);
+      renderSummaryTopics(); renderPromotionMedia(); renderSkuLists();
+      loadGlobalSkuFlags(); applyGlobalFlagsToDom();
+      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      updatePreview();
+      setStatus(offline ? "wait" : "ok", fromCache ? "Config ล่าสุดพร้อม" : "Config ออนไลน์พร้อม");
+    }).catch(() => {
+      if (requestId !== reportConfigRequestId) return false;
+      restoreBuiltinReportConfig();
+      renderSummaryTopics(); renderPromotionMedia(); renderSkuLists();
+      loadGlobalSkuFlags(); applyGlobalFlagsToDom();
+      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      updatePreview();
+      setStatus("wait", "ใช้ config ในเครื่อง");
+    }).finally(() => {
+      if (requestId === reportConfigRequestId){
+        reportConfigLoading = null;
+        reportConfigLoadingAccount = "";
+      }
+    });
+    reportConfigLoadingAccount = normalized;
+    return reportConfigLoading;
   }
 
   function createSkuRow(item){
@@ -1683,14 +1943,41 @@
     }
   }
 
+  function collectPromotionMediaSelectionsFromDom(){
+    const out = {};
+    for (const item of PROMOTION_MEDIA_ITEMS){
+      const input = promotionMediaList.querySelector(`[data-promotion-media-id="${cssEscape(item.id)}"]`);
+      if (input instanceof HTMLInputElement && input.checked) out[item.id] = true;
+    }
+    return out;
+  }
+
+  function applyPromotionMediaSelectionsToDom(raw){
+    const normalized = normalizePromotionMediaSelections(raw);
+    for (const item of PROMOTION_MEDIA_ITEMS){
+      const input = promotionMediaList.querySelector(`[data-promotion-media-id="${cssEscape(item.id)}"]`);
+      if (input instanceof HTMLInputElement) input.checked = !!normalized[item.id];
+    }
+  }
+
+  function buildPromotionMediaText(){
+    const selected = normalizePromotionMediaSelections(collectPromotionMediaSelectionsFromDom());
+    const lines = ["🪧สื่อโปรโมชั่น"];
+    for (const item of PROMOTION_MEDIA_ITEMS){
+      lines.push(`${item.label} : ${selected[item.id] ? "✅" : ""}`);
+    }
+    return lines.join("\n");
+  }
+
   function buildNotedPayloadForParent(){
     return {
-      v: 3,
+      v: 4,
       locationArea: String(locationArea.value || "").trim(),
       issue: safeText(issueValueOrDefault(issue.value)).trimEnd(),
       note: safeText(note.value).trimEnd(),
       skuChecks: collectSkuChecksFromDom(),
-      summarySelections: collectSummarySelectionsFromDom()
+      summarySelections: collectSummarySelectionsFromDom(),
+      promotionMediaSelections: collectPromotionMediaSelectionsFromDom()
     };
   }
 
@@ -1710,6 +1997,21 @@
     });
   }
 
+  function notifyParentReportSaved(){
+    if (!EMBED) return;
+    postToParent("PT_REPORT_SAVED", {
+      placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
+      reportToken: String((embedPrefillContext && embedPrefillContext.reportToken) || "").trim(),
+      sheetName: String((embedPrefillContext && embedPrefillContext.sheetName) || "").trim(),
+      savedAt: Date.now(),
+      reportDateISO: reportDate.value || todayISO(),
+      account: safeText(account.value).trim(),
+      branchCode: safeText(branchCode.value).trim(),
+      branchName: safeText(branchName.value).trim(),
+      noted: buildNotedPayloadForParent()
+    });
+  }
+
   function reportTeamLine(){
     const sheetName = safeText(embedPrefillContext.sheetName).trim();
     return sheetName || TEAM_REPORT;
@@ -1719,7 +2021,7 @@
     const d = parseISODate(reportDate.value) || new Date();
     const locationText = safeText(locationArea.value).trim();
     const issueText = safeText(issueValueOrDefault(issue.value)).trimEnd();
-    const noteText = safeText(note.value).trimEnd();
+    const noteText = [buildPromotionMediaText(), safeText(note.value).trimEnd()].filter(Boolean).join("\n\n");
 
     const lines = [
       `วันที่ ${formatReportDateBuddhist2(d)}`,
@@ -1866,6 +2168,7 @@
       data.note = noteValueOrDefault(note.value);
       data.skuChecks = collectSkuChecksFromDom();
       data.summarySelections = collectSummarySelectionsFromDom();
+      data.promotionMediaSelections = collectPromotionMediaSelectionsFromDom();
     } else {
       delete data.account;
       delete data.branchCode;
@@ -1875,6 +2178,7 @@
       delete data.note;
       delete data.skuChecks;
       delete data.summarySelections;
+      delete data.promotionMediaSelections;
     }
 
     saveJSON(STORE_FORM, data);
@@ -1903,6 +2207,7 @@
       note.value = noteValueOrDefault(data.note);
       applySkuChecksToDom(data.skuChecks || {});
       applySummarySelectionsToDom(data.summarySelections || {});
+      applyPromotionMediaSelectionsToDom(data.promotionMediaSelections || {});
     } else {
       account.value = "";
       branchCode.value = "";
@@ -1912,6 +2217,7 @@
       note.value = DEFAULT_NOTE_TEMPLATE;
       applySkuChecksToDom({});
       applySummarySelectionsToDom({});
+      applyPromotionMediaSelectionsToDom({});
     }
 
     const resolvedDate = resolveStoredReportDate(data.reportDate, data.reportDateMode);
@@ -1939,7 +2245,7 @@
   }
 
   function saveHistory(showError = false){
-    history = compactHistoryList(history);
+    history = compactHistoryList(history).filter((item) => !deletedHistoryIds.has(item.id));
     const ok = saveJSON(STORE_HISTORY, history);
     if (!ok && showError){
       setStatus("err", "คัดลอกแล้ว แต่บันทึกประวัติลงเครื่องไม่สำเร็จ");
@@ -1974,6 +2280,8 @@
   }
 
   function deleteHistoryEntry(id){
+    deletedHistoryIds.add(String(id));
+    saveDeletedHistoryIds();
     history = history.filter((item) => item.id !== id);
     selectedIds.delete(id);
     saveHistory();
@@ -1981,9 +2289,13 @@
     renderHistory();
   }
 
-  function clearAllHistory(){
-    history = [];
-    selectedIds.clear();
+  function clearHistoryItems(items){
+    const ids = new Set((items || []).map((item) => item.id));
+    if (!ids.size) return;
+    ids.forEach((id) => deletedHistoryIds.add(String(id)));
+    saveDeletedHistoryIds();
+    history = history.filter((item) => !ids.has(item.id));
+    ids.forEach((id) => selectedIds.delete(id));
     saveHistory();
     saveUIState();
     renderHistory();
@@ -2174,6 +2486,7 @@
 
     addHistoryEntry(text);
     saveFormState();
+    notifyParentReportSaved();
     setStatus(miss.length ? "wait" : "ok", miss.length
       ? `บันทึกในเครื่องแล้ว (ยังไม่ได้กรอก ${miss.join(", ")})`
       : "บันทึกสคริปต์ไว้ในเครื่องแล้ว");
@@ -2284,8 +2597,13 @@
   bindSaveOnInput(locationArea);
   bindSaveOnInput(issue);
   bindSaveOnInput(note);
+  account.addEventListener("change", () => { loadOnlineReportConfig(account.value); });
   summaryTopicList.addEventListener("change", () => {
     saveFormState();
+  });
+  promotionMediaList.addEventListener("change", () => {
+    saveFormState();
+    updatePreview();
   });
 
   skuBoard.addEventListener("change", (event) => {
@@ -2327,14 +2645,15 @@
   });
 
   if (btnClearAll) btnClearAll.addEventListener("click", () => {
-    if (!history.length){
-      showToast("ไม่มีประวัติให้ล้าง");
+    const selectedItems = history.filter((item) => selectedIds.has(item.id));
+    if (!selectedItems.length){
+      showToast("เลือกรายการที่ต้องการลบก่อน");
       return;
     }
     openConfirm(
-      "ยืนยันล้างประวัติทั้งหมด",
-      `ต้องการล้างประวัติทั้งหมดใช่ไหม?\n(จะลบ ${history.length} รายการ)`,
-      () => clearAllHistory()
+      "ยืนยันล้างประวัติ",
+      `ต้องการลบประวัติที่เลือกไว้ใช่ไหม?\n(จะลบ ${selectedItems.length} รายการ)`,
+      () => clearHistoryItems(selectedItems)
     );
   });
 
@@ -2351,6 +2670,7 @@
         note.value = DEFAULT_NOTE_TEMPLATE;
         clearAllSkuChecks();
         applySummarySelectionsToDom({});
+        applyPromotionMediaSelectionsToDom({});
         saveFormState();
         updatePreview();
         setStatus("wait", "ล้างฟอร์มแล้ว");
@@ -2359,7 +2679,7 @@
     );
   });
 
-  function applyPrefill(payload){
+  async function applyPrefill(payload){
     payload = payload || {};
     const own = (k) => Object.prototype.hasOwnProperty.call(payload, k);
     const noted = normalizeNotedState((payload.noted && typeof payload.noted === "object") ? payload.noted : payload);
@@ -2374,10 +2694,13 @@
 
     locationArea.value = noted.locationArea || "";
     issue.value = issueValueOrDefault(noted.issue);
-    note.value = noteValueOrDefault(noted.note);
-    applySkuChecksToDom(noted.skuChecks || {});
-    applySummarySelectionsToDom(noted.summarySelections || {});
+    note.value = String(noted.note ?? "");
     updatePreview();
+    await loadOnlineReportConfig(account.value, !!payload.forceConfigRefresh, {
+      skuChecks: noted.skuChecks || {},
+      summarySelections: noted.summarySelections || {},
+      promotionMediaSelections: noted.promotionMediaSelections || {}
+    }, payload.reportConfigVersion ?? null, !!payload.cacheOnly);
     setStatus("wait", "Prefill แล้ว (Popup)");
   }
 
@@ -2391,11 +2714,12 @@
       if (location.origin && e.origin && e.origin !== location.origin) return;
     } catch (err){}
 
-    applyPrefill(msg.payload || {});
-    try{
-      const targetOrigin = (location.origin && location.origin !== "null") ? location.origin : "*";
-      window.parent && window.parent.postMessage({ type: "PT_PREFILL_ACK" }, targetOrigin);
-    } catch (err){}
+    Promise.resolve(applyPrefill(msg.payload || {})).finally(() => {
+      try{
+        const targetOrigin = (location.origin && location.origin !== "null") ? location.origin : "*";
+        window.parent && window.parent.postMessage({ type: "PT_PREFILL_ACK", reportToken: String(msg.payload && msg.payload.reportToken || ""), prefillRequestId: Number(msg.payload && msg.payload.prefillRequestId) }, targetOrigin);
+      } catch (err){}
+    });
   });
 
   function applyEmbedModeUI(){
@@ -2428,6 +2752,7 @@
   }
 
   function boot(){
+    deletedHistoryIds = loadDeletedHistoryIds();
     if (HISTORY_MODE){
       document.body.classList.add("history-only");
       loadHistory();
@@ -2439,11 +2764,13 @@
 
     customerGroup.textContent = FIXED_CUSTOMER_GROUP;
     renderLocationOptions();
-    renderSummaryTopics();
+  renderSummaryTopics();
+  renderPromotionMedia();
     renderSkuLists();
     loadGlobalSkuFlags();
     applyGlobalFlagsToDom();
     const reportDateAdjusted = loadFormState();
+    if (!EMBED) loadOnlineReportConfig(account.value);
     loadHistory();
 
     if (!EMBED){
@@ -2471,6 +2798,14 @@
       setStatus("wait", "พร้อมใช้งาน");
     }
   }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== STORE_HISTORY_DELETED) return;
+    deletedHistoryIds = loadDeletedHistoryIds();
+    history = history.filter((item) => !deletedHistoryIds.has(item.id));
+    if (pruneSelectedIds()) saveUIState();
+    if (!EMBED) renderHistory();
+  });
 
   boot();
 })();
