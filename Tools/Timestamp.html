@@ -796,6 +796,84 @@
     }
 
     #fileInput{ display:none; }
+    .progressTrack{height:10px;background:#2a2a2f;border-radius:5px;overflow:hidden;margin-top:12px}
+    .progressFill{height:100%;width:0;background:#5eead4;transition:width .18s ease}
+    .previewCanvas{touch-action:none;transform-origin:center center;cursor:grab}
+    .previewCanvas:active{cursor:grabbing}
+
+    /* PHANToM Material 3: restrained glass surfaces, one mint-led color system. */
+    :root{
+      color-scheme: dark;
+      --bg:#071512;
+      --panel:rgba(16,34,30,.78);
+      --panel2:rgba(244,255,252,.075);
+      --line:rgba(180,241,226,.16);
+      --text:#F4FFFC;
+      --muted:rgba(244,255,252,.76);
+      --muted2:rgba(244,255,252,.56);
+      --accent:#24C4A3;
+      --accent-bright:#64E6CB;
+      --violet:#806DFF;
+      --danger:#FF5864;
+      --success:#36CF89;
+      --radius:8px;
+    }
+    body{background:var(--bg)}
+    .topbar{background:rgba(7,21,18,.62);backdrop-filter:blur(20px);border-bottom:1px solid rgba(180,241,226,.08)}
+    .brand .title{color:var(--text)}
+    .iconBtn,.camToggle,.actionBtn,.switch,.pill,.dtInput{background:rgba(16,34,30,.62);border-color:var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    .iconBtn:hover,.actionBtn:hover,.camToggle:hover{background:rgba(36,196,163,.14);border-color:rgba(100,230,203,.42)}
+    .appLaunchBtn{height:var(--iconBtn);display:inline-flex;align-items:center;gap:7px;padding:0 12px;border-radius:8px;border:1px solid rgba(100,230,203,.48);background:rgba(36,196,163,.15);color:var(--accent-bright);font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+    .appLaunchBtn svg{width:18px;height:18px}.appLaunchBtn:hover{background:rgba(36,196,163,.24)}.appLaunchBtn:active{transform:translateY(1px)}
+    .camToggle .track{background:rgba(244,255,252,.045);border-color:rgba(180,241,226,.12)}
+    .camToggle .knob{background:rgba(7,21,18,.64);border-color:rgba(180,241,226,.18);box-shadow:0 5px 18px rgba(0,0,0,.25)}
+    .camToggle.on .knob{background:rgba(36,196,163,.24);border-color:rgba(100,230,203,.58)}
+    .viewfinder{border-radius:12px;border-color:rgba(100,230,203,.22);box-shadow:0 20px 52px rgba(0,0,0,.38),0 0 0 1px rgba(36,196,163,.06)}
+    .vfOverlay .hint,.guideLabel{background:rgba(7,21,18,.62);border-color:rgba(180,241,226,.18);backdrop-filter:blur(16px)}
+    .guideFrame{border-color:var(--accent-bright);border-radius:8px}
+    .metaBar{border-radius:8px;background:rgba(16,34,30,.72);border-color:var(--line);backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.14)}
+    .valueSmall,.switch span{color:var(--text)}
+    .dtInput:focus,select.field:focus,input.field:focus,textarea.field:focus{border-color:var(--accent-bright);box-shadow:0 0 0 3px rgba(36,196,163,.2)}
+    .thumb{border-radius:8px;background:rgba(16,34,30,.75);border-color:var(--line)}
+    .thumb:hover{border-color:var(--accent-bright)}
+    .thumb .idx,.thumb .del{background:rgba(7,21,18,.72);border-color:rgba(180,241,226,.18);backdrop-filter:blur(10px)}
+    .thumb .del:hover{color:var(--danger);border-color:rgba(255,88,100,.55)}
+    .actionBtn.danger,.btn.danger{background:rgba(255,88,100,.12);border-color:rgba(255,88,100,.36);color:#FFD9DD}
+    .shutter{border-color:var(--accent-bright);background:rgba(16,34,30,.86);box-shadow:0 12px 38px rgba(0,0,0,.32),0 0 0 5px rgba(36,196,163,.1)}
+    .shutter::after{background:var(--accent-bright)}
+    .toast{background:rgba(16,34,30,.84);border-color:rgba(100,230,203,.34);box-shadow:0 12px 32px rgba(0,0,0,.28);backdrop-filter:blur(18px)}
+    .backdrop{background:rgba(2,10,8,.7);backdrop-filter:blur(10px)}
+    .modal{border-radius:12px;border-color:rgba(180,241,226,.18);background:rgba(16,34,30,.91);box-shadow:0 24px 80px rgba(0,0,0,.45);backdrop-filter:blur(28px)}
+    .modalHeader,.modalFooter{background:rgba(244,255,252,.035);border-color:rgba(180,241,226,.12)}
+    .modalHeader .hTitle,.card .label{color:var(--text)}
+    .card{border-radius:8px;background:rgba(244,255,252,.045);border-color:rgba(180,241,226,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+    .btn{border-radius:8px;background:rgba(244,255,252,.07);border-color:var(--line);color:var(--text);transition:background .16s ease,border-color .16s ease,transform .16s ease}
+    .btn:hover{background:rgba(100,230,203,.13);border-color:rgba(100,230,203,.46)}
+    .btn.primary{background:var(--accent);border-color:var(--accent-bright);color:#06231D;box-shadow:0 6px 18px rgba(36,196,163,.2)}
+    .btn.primary:hover{background:var(--accent-bright)}
+    select.field,input.field,textarea.field{border-radius:8px;background:rgba(7,21,18,.48);border-color:rgba(180,241,226,.18);color:var(--text)}
+    select.field option{background:#10221E;color:#F4FFFC}
+    .seg button{border-radius:8px;background:rgba(244,255,252,.06);border-color:var(--line);color:var(--text)}
+    .seg button.on{background:rgba(36,196,163,.16);border-color:var(--accent-bright);color:var(--accent-bright)}
+    .previewCanvas,#map,pre{border-radius:8px;border-color:rgba(180,241,226,.16)}
+    pre{background:rgba(7,21,18,.52);color:var(--muted)}
+    .progressTrack{background:rgba(244,255,252,.1);border-radius:999px}.progressFill{background:var(--accent-bright)}
+
+    @media (prefers-color-scheme: light){
+      :root{color-scheme:light;--bg:#F4FBF9;--panel:rgba(255,255,255,.78);--panel2:rgba(16,35,31,.06);--line:rgba(16,35,31,.14);--text:#10231F;--muted:rgba(16,35,31,.72);--muted2:rgba(16,35,31,.52)}
+      body{background:var(--bg)}
+      .topbar{background:rgba(244,251,249,.72)}
+      .iconBtn,.camToggle,.actionBtn,.switch,.pill,.dtInput,.metaBar{background:rgba(255,255,255,.64)}
+      .camToggle .knob,.vfOverlay .hint,.guideLabel{background:rgba(255,255,255,.76);color:var(--text)}
+      .modal{background:rgba(255,255,255,.9)}
+      .modalHeader,.modalFooter,.card{background:rgba(255,255,255,.56)}
+      select.field,input.field,textarea.field{background:rgba(244,251,249,.78);color:var(--text)}
+      select.field option{background:#FFFFFF;color:#10231F}
+      .valueSmall,.switch span,.modalHeader .hTitle,.card .label{color:var(--text)}
+      .thumb .idx,.thumb .del{background:rgba(255,255,255,.78);color:var(--text)}
+      .toast{background:rgba(255,255,255,.86);color:var(--text)}
+      pre{background:rgba(244,251,249,.82);color:var(--text)}
+    }
   </style>
 </head>
 
@@ -827,6 +905,11 @@
 
         <button class="iconBtn" id="btnDownloadAll" title="Download All" disabled>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v2H5v-2zM12 2l5.5 5.5-1.4 1.4L13 5.8V16h-2V5.8L7.9 8.9 6.5 7.5 12 2z"/></svg>
+        </button>
+
+        <button class="appLaunchBtn" id="btnOpenNative" type="button" title="เปิด Timestamp Cam">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2zm5 18.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM8 5v10h8V5H8z"/></svg>
+          <span>เปิดแอป</span>
         </button>
 
         <button class="iconBtn" id="btnSettings" title="Settings">
@@ -873,7 +956,7 @@
             </label>
           </div>
         </div>
-        <input id="customTimeMain" class="dtInput" type="datetime-local" />
+        <input id="customTimeMain" class="dtInput" type="datetime-local" step="1" />
         <div class="metaRow">
           <div class="metaLeft">
             <div class="labelSmall">ตำแหน่ง</div>
@@ -912,6 +995,29 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
+  <div class="backdrop" id="progressBackdrop" aria-hidden="true">
+    <div class="modal" style="width:min(430px,calc(100% - 32px));max-height:none">
+      <div class="modalBody">
+        <div class="label" id="progressTitle">กำลังทำงาน…</div>
+        <div class="mini" id="progressText">เตรียมข้อมูล</div>
+        <div class="progressTrack"><div class="progressFill" id="progressFill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="appInstallBackdrop" aria-hidden="true">
+    <div class="modal" style="width:min(420px,calc(100% - 32px));max-height:none">
+      <div class="modalBody">
+        <div class="label">ยังไม่ได้ติดตั้งแอป</div>
+        <div class="mini">ติดตั้ง Timestamp Cam เพื่อใช้กล้องและฟังก์ชัน native บนอุปกรณ์นี้</div>
+        <div class="grid2">
+          <button class="btn" id="btnCancelAppInstall" type="button">ยกเลิก</button>
+          <button class="btn primary" id="btnDownloadApp" type="button">ดาวน์โหลดแอป</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Preview Modal -->
   <div class="backdrop" id="previewBackdrop" aria-hidden="true">
     <div class="modal">
@@ -932,8 +1038,28 @@
             <button id="photoTimeNow" type="button">ใช้เวลาปัจจุบัน</button>
             <button id="photoTimeCustom" type="button">เลือกเวลาเอง</button>
           </div>
-          <input id="photoCustomTime" class="field" type="datetime-local" />
+          <input id="photoCustomTime" class="field" type="datetime-local" step="1" />
           <div class="mini" id="photoTimeHint">ค่าเริ่มต้นมาจาก “หน้าหลัก” ตอนถ่าย/นำเข้า แต่แก้เฉพาะรูปนี้ได้</div>
+        </div>
+
+        <div class="card" id="photoRemarkCard">
+          <div class="label">Remark (ต่อรูปนี้)</div>
+          <textarea id="photoRemark" class="field" rows="3" placeholder="เพิ่ม Remark สำหรับรูปนี้"></textarea>
+          <button class="btn" id="btnSaveRemark">บันทึก Remark</button>
+        </div>
+
+        <div class="card" id="photoLocationCard">
+          <div class="label">ตำแหน่ง (ต่อรูปนี้)</div>
+          <div class="grid2">
+            <input id="photoLatitude" class="field" type="number" step="any" placeholder="Latitude" />
+            <input id="photoLongitude" class="field" type="number" step="any" placeholder="Longitude" />
+          </div>
+          <div class="grid2">
+            <button class="btn" id="btnPhotoLocationCurrent">ใช้ตำแหน่งปัจจุบัน</button>
+            <button class="btn" id="btnPhotoLocationGlobal">ใช้ตำแหน่งจาก Settings</button>
+          </div>
+          <button class="btn" id="btnSavePhotoLocation">บันทึกตำแหน่ง</button>
+          <div class="mini" id="photoLocationHint">เมื่อไม่พบตำแหน่ง จะแสดง “ไม่พบตำแหน่ง”</div>
         </div>
 
         <div class="card">
@@ -983,7 +1109,7 @@
             </label>
             <div>
               <div class="mini">เลือกเวลาเอง (เมื่อปิดใช้เวลาปัจจุบัน)</div>
-              <input id="customTime" class="field" type="datetime-local" />
+              <input id="customTime" class="field" type="datetime-local" step="1" />
             </div>
           </div>
           <div class="mini" id="timeStatus">-</div>
@@ -992,8 +1118,9 @@
         <div class="card">
           <div class="label">รูปแบบ Timestamp (ค่าเริ่มต้น = Thai verbose + GMT)</div>
           <select id="timeFormat" class="field">
-            <option value="thaiVerboseGmt" selected>ไทยแบบยาว + GMT+07:00 (ค่าเริ่มต้น)</option>
-            <option value="isoLike">YYYY-MM-DD HH:mm:ss</option>
+            <option value="sample-overlay" selected>แบบภาพตัวอย่าง</option>
+            <option value="thai-verbose">ไทยแบบยาว + GMT+07:00</option>
+            <option value="iso">YYYY-MM-DD HH:mm:ss</option>
           </select>
           <div class="mini">โหมด 2: จะโชว์ 2 บรรทัด พร้อม label “Network:” และ “Local:”</div>
         </div>
@@ -1072,7 +1199,35 @@
             <span>Auto (สเกลตาม Output)</span>
           </label>
 
+          <div class="grid2">
+            <div><div class="mini">ฟอนต์</div><select id="fontFamily" class="field"><option value="android-ui">Android UI</option><option value="sans-serif">Sans Serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select></div>
+            <div><div class="mini">น้ำหนักตัวอักษร</div><input id="fontWeight" class="field" type="number" min="100" max="900" step="100" value="400" /></div>
+          </div>
+          <div class="grid2">
+            <div><div class="mini">ความหนาขอบดำ</div><input id="strokeWidth" class="field" type="number" min="0" max="12" step="0.1" value="0.4" /></div>
+            <div><div class="mini">ความสูงตัวอักษร</div><input id="fontHeightScale" class="field" type="number" min="0.6" max="2" step="0.05" value="1.05" /></div>
+          </div>
+
           <div class="mini">ข้อความจะวาดด้วย stroke + shadow เพื่ออ่านง่าย (ไม่ใช้พื้นหลังดำ)</div>
+        </div>
+
+        <div class="card">
+          <div class="label">กรอบเวลาและตำแหน่ง</div>
+          <div class="mini">กำหนด x,y,width,height เป็นเปอร์เซ็นต์ของภาพ ข้อความยาวจะตัดบรรทัดโดยไม่ย่อฟอนต์</div>
+          <div class="grid2">
+            <div><div class="mini">กรอบเวลา x,y,w,h (%)</div><input id="timeFrame" class="field" placeholder="8,0,92,16" /></div>
+            <div><div class="mini">กรอบตำแหน่ง x,y,w,h (%)</div><input id="locationFrame" class="field" placeholder="56.4,6.7,43.6,42.1" /></div>
+          </div>
+          <div class="grid2">
+            <select id="timeAlign" class="field"><option value="right-top">เวลา: ขวาบน</option><option value="left-top">เวลา: ซ้ายบน</option><option value="center-top">เวลา: กลางบน</option><option value="left-middle">เวลา: ซ้ายกลาง</option><option value="center-middle">เวลา: กึ่งกลาง</option><option value="right-middle">เวลา: ขวากลาง</option><option value="left-bottom">เวลา: ซ้ายล่าง</option><option value="center-bottom">เวลา: กลางล่าง</option><option value="right-bottom">เวลา: ขวาล่าง</option></select>
+            <select id="locationAlign" class="field"><option value="right-top">ตำแหน่ง: ขวาบน</option><option value="left-top">ตำแหน่ง: ซ้ายบน</option><option value="center-top">ตำแหน่ง: กลางบน</option><option value="left-middle">ตำแหน่ง: ซ้ายกลาง</option><option value="center-middle">ตำแหน่ง: กึ่งกลาง</option><option value="right-middle">ตำแหน่ง: ขวากลาง</option><option value="left-bottom">ตำแหน่ง: ซ้ายล่าง</option><option value="center-bottom">ตำแหน่ง: กลางล่าง</option><option value="right-bottom">ตำแหน่ง: ขวาล่าง</option></select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Remark</div>
+          <label class="switch"><input id="showRemark" type="checkbox" /><span>แสดง Remark บนรูป</span></label>
+          <textarea id="defaultRemark" class="field" rows="3" placeholder="Remark เริ่มต้นสำหรับรูปใหม่"></textarea>
         </div>
 
         <div class="card">
@@ -1091,6 +1246,9 @@
                 <input id="showAddress" type="checkbox" checked />
                 <span>แสดงที่อยู่</span>
               </label>
+              <label class="switch"><input id="showSubdistrict" type="checkbox" /><span>แสดงแขวง/ตำบล</span></label>
+              <label class="switch"><input id="showDistrict" type="checkbox" /><span>แสดงเขต/อำเภอ</span></label>
+              <label class="switch"><input id="showProvince" type="checkbox" /><span>แสดงจังหวัด</span></label>
             </div>
           </div>
 
@@ -1236,21 +1394,34 @@
   const DEFAULT_SETTINGS = {
     useNow: true,
     customTime: "",
-    timeFormat: "thaiVerboseGmt",
+    timeFormat: "sample-overlay",
 
-    outputMode: "preset",
+    outputMode: "original",
     outputSize: "1080x2340",
-    fitMode: "contain",
+    fitMode: "cover",
 
     overlayPos: "tr",
-    overlayPad: 24,
+    overlayPad: 26,
     fontAuto: true,
-    fontScale: 100,
+    fontScale: 110,
     fontPx: 32,
+    fontWeight: 400,
+    strokeWidth: 0.4,
+    fontHeightScale: 1.05,
+    fontFamily: "android-ui",
+    timeFrame: { x:.08, y:0, width:.92, height:.16 },
+    locationFrame: { x:.5640195355, y:.0673555501, width:.4359804645, height:.421471049 },
+    timeAlign: "right-top",
+    locationAlign: "right-top",
 
-    enableLocation: false,
-    showLatLng: true,
-    showAddress: true,
+    enableLocation: true,
+    showLatLng: false,
+    showAddress: false,
+    showSubdistrict: false,
+    showDistrict: true,
+    showProvince: true,
+    showRemark: true,
+    defaultRemark: "",
     lat: "",
     lng: "",
     placeQuery: "",
@@ -1277,6 +1448,7 @@
   const btnTorch = document.getElementById("btnTorch");
   const btnImport = document.getElementById("btnImport");
   const btnDownloadAll = document.getElementById("btnDownloadAll");
+  const btnOpenNative = document.getElementById("btnOpenNative");
   const btnSettings = document.getElementById("btnSettings");
 
   const btnShutter = document.getElementById("btnShutter");
@@ -1286,6 +1458,13 @@
   const fileInput = document.getElementById("fileInput");
   const gallery = document.getElementById("gallery");
   const photoCountPill = document.getElementById("photoCountPill");
+  const progressBackdrop = document.getElementById("progressBackdrop");
+  const progressTitle = document.getElementById("progressTitle");
+  const progressText = document.getElementById("progressText");
+  const progressFill = document.getElementById("progressFill");
+  const appInstallBackdrop = document.getElementById("appInstallBackdrop");
+  const btnCancelAppInstall = document.getElementById("btnCancelAppInstall");
+  const btnDownloadApp = document.getElementById("btnDownloadApp");
 
   const useNowMain = document.getElementById("useNowMain");
   const customTimeMain = document.getElementById("customTimeMain");
@@ -1311,6 +1490,17 @@
   const btnDownloadOne = document.getElementById("btnDownloadOne");
   const btnDeleteOne = document.getElementById("btnDeleteOne");
   const previewStatus = document.getElementById("previewStatus");
+  let previewZoom = 1, previewPanX = 0, previewPanY = 0, previewDrag = null;
+  const photoRemarkCard = document.getElementById("photoRemarkCard");
+  const photoRemark = document.getElementById("photoRemark");
+  const btnSaveRemark = document.getElementById("btnSaveRemark");
+  const photoLocationCard = document.getElementById("photoLocationCard");
+  const photoLatitude = document.getElementById("photoLatitude");
+  const photoLongitude = document.getElementById("photoLongitude");
+  const btnPhotoLocationCurrent = document.getElementById("btnPhotoLocationCurrent");
+  const btnPhotoLocationGlobal = document.getElementById("btnPhotoLocationGlobal");
+  const btnSavePhotoLocation = document.getElementById("btnSavePhotoLocation");
+  const photoLocationHint = document.getElementById("photoLocationHint");
 
   // Settings
   const settingsBackdrop = document.getElementById("settingsBackdrop");
@@ -1333,10 +1523,23 @@
   const fontScale = document.getElementById("fontScale");
   const fontPx = document.getElementById("fontPx");
   const fontAuto = document.getElementById("fontAuto");
+  const fontFamily = document.getElementById("fontFamily");
+  const fontWeight = document.getElementById("fontWeight");
+  const strokeWidth = document.getElementById("strokeWidth");
+  const fontHeightScale = document.getElementById("fontHeightScale");
+  const timeFrame = document.getElementById("timeFrame");
+  const locationFrame = document.getElementById("locationFrame");
+  const timeAlign = document.getElementById("timeAlign");
+  const locationAlign = document.getElementById("locationAlign");
+  const showRemark = document.getElementById("showRemark");
+  const defaultRemark = document.getElementById("defaultRemark");
 
   const enableLocation = document.getElementById("enableLocation");
   const showLatLng = document.getElementById("showLatLng");
   const showAddress = document.getElementById("showAddress");
+  const showSubdistrict = document.getElementById("showSubdistrict");
+  const showDistrict = document.getElementById("showDistrict");
+  const showProvince = document.getElementById("showProvince");
   const btnUseGPS = document.getElementById("btnUseGPS");
   const btnOpenMap = document.getElementById("btnOpenMap");
   const latEl = document.getElementById("lat");
@@ -1364,6 +1567,13 @@
   const pad2 = (n) => String(n).padStart(2,"0");
   const clamp = (v,min,max) => Math.max(min, Math.min(max, v));
   const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+  function frameToText(f){ const x=f||{x:.04,y:.04,width:.92,height:.16}; return [x.x*100,x.y*100,x.width*100,x.height*100].map(v=>Number(v.toFixed(4))).join(", "); }
+  function textToFrame(text, fallback){
+    const values=String(text||"").split(",").map(Number);
+    if(values.length!==4 || values.some(v=>!Number.isFinite(v))) return fallback;
+    const [x,y,width,height]=values.map(v=>v/100);
+    return {x:clamp(x,0,1),y:clamp(y,0,1),width:clamp(width,.08,1-x),height:clamp(height,.08,1-y)};
+  }
 
   const logs = [];
   function ts(){
@@ -1441,9 +1651,71 @@
   }
 
   function formatBySetting(date){
-    const fmt = state.settings.timeFormat || "thaiVerboseGmt";
-    if (fmt === "isoLike") return formatIsoLike(date);
+    const fmt = state.settings.timeFormat || "sample-overlay";
+    if (fmt === "iso" || fmt === "isoLike") return formatIsoLike(date);
+    if (fmt === "sample-overlay") {
+      const month = date.toLocaleString("th-TH", { month: "short" }).replace(".", "");
+      return `${date.getDate()} ${month} ${date.getFullYear()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+    }
     return formatThaiVerboseGmt(date);
+  }
+  function showProgress(title, current=0, total=1){
+    progressTitle.textContent = title;
+    progressText.textContent = total ? `${current} / ${total}` : "กำลังเตรียมข้อมูล";
+    progressFill.style.width = `${Math.max(0, Math.min(100, total ? current / total * 100 : 0))}%`;
+    openBackdrop(progressBackdrop);
+  }
+  function hideProgress(){ closeBackdrop(progressBackdrop); }
+  function applyPreviewTransform(){
+    previewCanvas.style.transform = `translate(${previewPanX}px, ${previewPanY}px) scale(${previewZoom})`;
+  }
+  function resetPreviewTransform(){ previewZoom=1; previewPanX=0; previewPanY=0; applyPreviewTransform(); }
+
+  const NATIVE_PACKAGE = "com.example.timestamp";
+  const RELEASES_API_URL = "https://api.github.com/repos/surakiatforwork-art/Timestamp_Cam/releases/latest";
+  const APK_DOWNLOAD_FALLBACK_URL = "https://github.com/surakiatforwork-art/Timestamp_Cam/releases/download/v1.3.0/app-debug.apk";
+  let nativeLaunchTimer = null;
+  function openNativeApp(){
+    if (!/Android/i.test(navigator.userAgent)){
+      openBackdrop(appInstallBackdrop);
+      return;
+    }
+    const fallbackUrl = new URL(window.location.href);
+    fallbackUrl.searchParams.set("native-missing", "1");
+    let appOpened = false;
+    const onVisibilityChange = () => { if (document.hidden) appOpened = true; };
+    document.addEventListener("visibilitychange", onVisibilityChange, {once:true});
+    // Chrome uses this explicit fallback instead of its default Play Store route.
+    window.location.href = `intent://open/#Intent;scheme=phantomtimestamp;package=${NATIVE_PACKAGE};S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end`;
+    clearTimeout(nativeLaunchTimer);
+    nativeLaunchTimer = setTimeout(() => {
+      if (!appOpened && !document.hidden) openBackdrop(appInstallBackdrop);
+    }, 900);
+  }
+  async function downloadNativeApk(){
+    closeBackdrop(appInstallBackdrop);
+    const originalLabel = btnDownloadApp.textContent;
+    btnDownloadApp.disabled = true;
+    btnDownloadApp.textContent = "กำลังหาเวอร์ชันล่าสุด…";
+    try{
+      const response = await fetch(RELEASES_API_URL, { headers: { "Accept": "application/vnd.github+json" } });
+      if (!response.ok) throw new Error("โหลดข้อมูล release ไม่สำเร็จ");
+      const release = await response.json();
+      const apk = (release.assets || []).find(asset => /\.apk$/i.test(asset.name || "") && asset.browser_download_url);
+      if (!apk) throw new Error("ไม่พบ APK ใน release ล่าสุด");
+      window.location.assign(apk.browser_download_url);
+    } catch (error){
+      addLog("latest APK lookup failed: " + String(error?.message || error));
+      showToast("ใช้ลิงก์สำรองสำหรับดาวน์โหลด");
+      window.location.assign(APK_DOWNLOAD_FALLBACK_URL);
+    } finally {
+      btnDownloadApp.disabled = false;
+      btnDownloadApp.textContent = originalLabel;
+    }
+  }
+  if (new URLSearchParams(window.location.search).get("native-missing") === "1"){
+    history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`);
+    setTimeout(() => openBackdrop(appInstallBackdrop), 80);
   }
 
   function toNumberOrNull(v){
@@ -1523,12 +1795,25 @@
     overlayPos.value = state.settings.overlayPos || "tr";
     overlayPad.value = String(state.settings.overlayPad ?? 24);
     fontAuto.checked = !!state.settings.fontAuto;
+    fontFamily.value = state.settings.fontFamily || "android-ui";
     fontScale.value = String(state.settings.fontScale ?? 100);
     fontPx.value = String(state.settings.fontPx ?? 32);
+    fontWeight.value = String(state.settings.fontWeight ?? 400);
+    strokeWidth.value = String(state.settings.strokeWidth ?? .4);
+    fontHeightScale.value = String(state.settings.fontHeightScale ?? 1.05);
+    timeFrame.value = frameToText(state.settings.timeFrame);
+    locationFrame.value = frameToText(state.settings.locationFrame);
+    timeAlign.value = state.settings.timeAlign || "right-top";
+    locationAlign.value = state.settings.locationAlign || "right-top";
+    showRemark.checked = !!state.settings.showRemark;
+    defaultRemark.value = state.settings.defaultRemark || "";
 
     enableLocation.checked = !!state.settings.enableLocation;
     showLatLng.checked = (state.settings.showLatLng ?? true);
     showAddress.checked = (state.settings.showAddress ?? true);
+    showSubdistrict.checked = !!state.settings.showSubdistrict;
+    showDistrict.checked = !!state.settings.showDistrict;
+    showProvince.checked = !!state.settings.showProvince;
     latEl.value = state.settings.lat ?? "";
     lngEl.value = state.settings.lng ?? "";
     placeQuery.value = state.settings.placeQuery ?? "";
@@ -1931,7 +2216,12 @@
         timeMode: p.timeMode,
         timeValueISO: p.timeValueISO,
         sourceName: p.sourceName,
-        fromFrontMirror: p.fromFrontMirror
+        fromFrontMirror: p.fromFrontMirror,
+        remark: p.remark || "",
+        locationLatitude: p.locationLatitude ?? null,
+        locationLongitude: p.locationLongitude ?? null,
+        locationAddress: p.locationAddress ?? null,
+        locationDetails: p.locationDetails ?? null
       });
       addLog(`idb saved photo: ${p.id}`);
     } catch (e){
@@ -1966,7 +2256,12 @@
           timeMode: r.timeMode || "now",
           timeValueISO: r.timeValueISO || (r.createdAtISO || new Date().toISOString()),
           sourceName: r.sourceName || "restored",
-          fromFrontMirror: !!r.fromFrontMirror
+          fromFrontMirror: !!r.fromFrontMirror,
+          remark: r.remark || "",
+          locationLatitude: r.locationLatitude ?? null,
+          locationLongitude: r.locationLongitude ?? null,
+          locationAddress: r.locationAddress ?? null,
+          locationDetails: r.locationDetails ?? null
         };
         state.photos.push(p);
       }
@@ -1991,7 +2286,12 @@
       timeMode: t.mode,
       timeValueISO: t.iso,
       sourceName,
-      fromFrontMirror: !!fromFrontMirror
+      fromFrontMirror: !!fromFrontMirror,
+      remark: state.settings.defaultRemark || "",
+      locationLatitude: toNumberOrNull(latEl.value),
+      locationLongitude: toNumberOrNull(lngEl.value),
+      locationAddress: state.addressText || null,
+      locationDetails: state.settings.locationDetails || null
     };
     state.photos.push(p);
 
@@ -2006,8 +2306,9 @@
 
   async function addPhotosFromFiles(files){
     if (!files || !files.length) return;
-    showToast("กำลังนำเข้ารูป…");
-    for (const f of files){
+    showProgress("กำลังอัปโหลดภาพ", 0, files.length);
+    for (let index=0; index<files.length; index++){
+      const f = files[index];
       try{
         const img = await loadImageFromFile(f);
         const orient = await getExifOrientation(f);
@@ -2016,7 +2317,10 @@
       } catch (e){
         addLog("import failed: " + String(e?.message||e));
       }
+      showProgress("กำลังอัปโหลดภาพ", index+1, files.length);
     }
+    hideProgress();
+    showToast("นำเข้ารูปแล้ว");
     refreshLocSummary();
   }
 
@@ -2120,58 +2424,64 @@
     return clamp(Math.round(autoPx * (scalePct/100)), 10, 220);
   }
 
-  function buildOverlayLines(date){
-    const s = formatBySetting(date);
-    const lines = [`Network: ${s}`, `Local: ${s}`];
-
-    if (state.settings.enableLocation && hasValidLatLng()){
-      const lat = Number(latEl.value);
-      const lng = Number(lngEl.value);
-      if (state.settings.showLatLng) lines.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      if (state.settings.showAddress) lines.push(state.addressText ? state.addressText : "(ที่อยู่ยังไม่พร้อม)");
+  function buildOverlayLines(date, photo){
+    const formatted = formatBySetting(date);
+    const time = [`Network: ${formatted}`, `Local: ${formatted}`];
+    const location = [];
+    const lat = photo.locationLatitude ?? toNumberOrNull(latEl.value);
+    const lng = photo.locationLongitude ?? toNumberOrNull(lngEl.value);
+    const address = photo.locationAddress ?? state.addressText;
+    const details = photo.locationDetails || state.settings.locationDetails || {};
+    if (state.settings.enableLocation){
+      if (state.settings.showLatLng && lat!==null && lng!==null) location.push(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      if (state.settings.showAddress && address) location.push(address);
+      if (state.settings.showSubdistrict && details.subdistrict) location.push(`แขวง/ตำบล: ${details.subdistrict}`);
+      if (state.settings.showDistrict && details.district) location.push(`เขต/อำเภอ: ${details.district}`);
+      if (state.settings.showProvince && details.province) location.push(`จังหวัด: ${details.province}`);
+      if (!location.length && !photo.remark) location.push("ไม่พบตำแหน่ง");
     }
-    return lines;
+    if (state.settings.showRemark && photo.remark) location.push(`Remark : ${photo.remark}`);
+    return {time, location};
   }
 
-  function drawOverlayText(ctx, lines, outW, outH){
+  function wrapCanvasText(ctx, text, maxWidth){
+    if (ctx.measureText(text).width<=maxWidth) return [text];
+    const tokens=text.includes(" ") ? text.split(/\s+/) : Array.from(text), out=[]; let line="";
+    for(const token of tokens){ const next=line ? `${line}${text.includes(" ")?" ":""}${token}` : token; if(line && ctx.measureText(next).width>maxWidth){out.push(line);line=token}else line=next; }
+    if(line) out.push(line); return out;
+  }
+
+  function drawOverlayText(ctx, lines, frame, align, outW, outH){
     const fontSize = computeFontSize(outW, outH);
     const pad = clamp(Number(state.settings.overlayPad) || 24, 8, 120);
-    const lineGap = Math.round(fontSize * 1.18);
-
-    const pos = state.settings.overlayPos || "tr";
-    const isTop = (pos === "tr" || pos === "tl");
-    const isRight = (pos === "tr" || pos === "br");
+    const heightScale = Number(state.settings.fontHeightScale)||1;
+    const lineGap = Math.round(fontSize * 1.25 * heightScale);
+    const fx=frame.x*outW, fy=frame.y*outH, fw=frame.width*outW, fh=frame.height*outH;
 
     ctx.save();
-    ctx.font = `900 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif`;
-    ctx.textAlign = isRight ? "right" : "left";
-    ctx.textBaseline = isTop ? "top" : "bottom";
+    const family = state.settings.fontFamily === "serif" ? 'Georgia, "Noto Serif Thai", serif' : state.settings.fontFamily === "monospace" ? 'ui-monospace, monospace' : state.settings.fontFamily === "sans-serif" ? 'Arial, "Noto Sans Thai", sans-serif' : 'Roboto, "Noto Sans Thai", system-ui, sans-serif';
+    ctx.font = `${state.settings.fontWeight||400} ${fontSize}px ${family}`;
+    const wrapped = lines.flatMap(line=>wrapCanvasText(ctx,line,Math.max(1,fw-pad*2)));
+    const [horizontal,vertical]=(align||"right-top").split("-");
+    ctx.textAlign = horizontal;
+    ctx.textBaseline = "top";
 
     ctx.shadowColor = "rgba(0,0,0,.85)";
     ctx.shadowBlur = Math.round(fontSize * 0.35);
     ctx.lineJoin = "round";
     ctx.miterLimit = 2;
 
-    const x = isRight ? (outW - pad) : pad;
-    let y = isTop ? pad : (outH - pad);
+    const x = horizontal==="left" ? fx+pad : horizontal==="right" ? fx+fw-pad : fx+fw/2;
+    const textHeight=wrapped.length*lineGap;
+    let y = vertical==="top" || textHeight>fh-pad*2 ? fy+pad : vertical==="bottom" ? fy+fh-pad-textHeight : fy+(fh-textHeight)/2;
 
     ctx.strokeStyle = "rgba(0,0,0,.92)";
-    ctx.lineWidth = Math.max(3, Math.round(fontSize * 0.14));
+    ctx.lineWidth = Math.max(0, Number(state.settings.strokeWidth) || 0);
     ctx.fillStyle = "rgba(255,255,255,.96)";
 
-    if (isTop){
-      for (const line of lines){
-        ctx.strokeText(line, x, y);
-        ctx.fillText(line, x, y);
-        y += lineGap;
-      }
-    } else {
-      for (let i = lines.length - 1; i >= 0; i--){
-        const line = lines[i];
-        ctx.strokeText(line, x, y);
-        ctx.fillText(line, x, y);
-        y -= lineGap;
-      }
+    for (const line of wrapped){
+      ctx.save(); ctx.translate(x,y); ctx.scale(1,heightScale);
+      if(ctx.lineWidth>0) ctx.strokeText(line,0,0); ctx.fillText(line,0,0); ctx.restore(); y += lineGap;
     }
     ctx.restore();
   }
@@ -2255,11 +2565,12 @@
       }
     }
 
-    const lines = buildOverlayLines(date);
-    drawOverlayText(ctx, lines, outW, outH);
+    const groups = buildOverlayLines(date, photo);
+    drawOverlayText(ctx, groups.time, state.settings.timeFrame, state.settings.timeAlign, outW, outH);
+    drawOverlayText(ctx, groups.location, state.settings.locationFrame, state.settings.locationAlign, outW, outH);
 
     baseBmp.close?.();
-    return { outW, outH, lines: lines.length };
+    return { outW, outH, lines: groups.time.length + groups.location.length };
   }
 
   /* ✅ Capture: ครอปตาม “สิ่งที่เห็นใน viewfinder” */
@@ -2314,6 +2625,7 @@
     state.selectedId = id;
     const p = getSelectedPhoto();
     if (!p) return;
+    resetPreviewTransform();
 
     previewTitle.textContent = `Photo #${state.photos.findIndex(x => x.id === id)+1}`;
 
@@ -2328,8 +2640,14 @@
     }
 
     const dt = new Date(p.timeValueISO || Date.now());
-    const v = `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}T${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    const v = `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}T${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}`;
     photoCustomTime.value = v;
+    photoRemark.value = p.remark || "";
+    photoRemarkCard.style.display = state.settings.showRemark ? "grid" : "none";
+    photoLocationCard.style.display = state.settings.enableLocation ? "grid" : "none";
+    photoLatitude.value = p.locationLatitude ?? latEl.value ?? "";
+    photoLongitude.value = p.locationLongitude ?? lngEl.value ?? "";
+    photoLocationHint.textContent = (photoLatitude.value && photoLongitude.value) ? "ตำแหน่งนี้มีผลกับรูปนี้เท่านั้น" : "เมื่อไม่พบตำแหน่ง จะแสดง “ไม่พบตำแหน่ง”";
 
     previewStatus.textContent = "กำลังเรนเดอร์…";
     openBackdrop(previewBackdrop);
@@ -2376,17 +2694,7 @@
     }
 
     // ✅ persist time change
-    idbPutPhoto({
-      id: p.id,
-      baseBlob: p.baseBlob,
-      w: p.w,
-      h: p.h,
-      createdAtISO: p.createdAtISO,
-      timeMode: p.timeMode,
-      timeValueISO: p.timeValueISO,
-      sourceName: p.sourceName,
-      fromFrontMirror: p.fromFrontMirror
-    }).catch(e => addLog("idb update time failed: " + String(e?.message||e)));
+    persistPhotoToIDB(p).catch(e => addLog("idb update time failed: " + String(e?.message||e)));
 
     renderPreview();
   }
@@ -2429,7 +2737,7 @@
     if (window.showDirectoryPicker){
       try{
         const dir = await window.showDirectoryPicker({ mode: "readwrite" });
-        showToast("กำลังเขียนไฟล์…");
+        showProgress("กำลังดาวน์โหลดภาพ", 0, state.photos.length);
 
         for (let i=0;i<state.photos.length;i++){
           const p = state.photos[i];
@@ -2442,12 +2750,15 @@
           const writable = await fileHandle.createWritable();
           await writable.write(blob);
           await writable.close();
+          showProgress("กำลังดาวน์โหลดภาพ", i+1, state.photos.length);
         }
 
+        hideProgress();
         showToast("Download All สำเร็จ");
         addLog(`downloadAll: wrote ${state.photos.length} files via DirectoryPicker`);
         return;
       } catch (e){
+        hideProgress();
         addLog("DirectoryPicker failed: " + String(e?.message||e));
         showToast("DirectoryPicker ใช้ไม่ได้ — ใช้ fallback");
       }
@@ -2455,7 +2766,7 @@
 
     if (window.JSZip){
       try{
-        showToast("กำลังทำ ZIP…");
+        showProgress("กำลังเตรียมไฟล์ ZIP", 0, state.photos.length);
         const zip = new JSZip();
 
         for (let i=0;i<state.photos.length;i++){
@@ -2466,6 +2777,7 @@
 
           const name = `PT_${stamp}_${i+1}.${ext}`;
           zip.file(name, blob);
+          showProgress("กำลังเตรียมไฟล์ ZIP", i+1, state.photos.length);
         }
 
         const zipBlob = await zip.generateAsync({ type: "blob" });
@@ -2478,15 +2790,17 @@
         a.remove();
         setTimeout(() => { try{ URL.revokeObjectURL(url); }catch{} }, 1500);
 
+        hideProgress();
         showToast("ดาวน์โหลด ZIP แล้ว");
         addLog("downloadAll: zip fallback");
         return;
       } catch (e){
+        hideProgress();
         addLog("JSZip failed: " + String(e?.message||e));
       }
     }
 
-    showToast("กำลังดาวน์โหลดทีละไฟล์…");
+    showProgress("กำลังดาวน์โหลดภาพ", 0, state.photos.length);
     for (let i=0;i<state.photos.length;i++){
       const p = state.photos[i];
       const outCanvas = document.createElement("canvas");
@@ -2502,6 +2816,7 @@
       a.click();
       a.remove();
       setTimeout(() => { try{ URL.revokeObjectURL(url); }catch{} }, 1200);
+      showProgress("กำลังดาวน์โหลดภาพ", i+1, state.photos.length);
 
       await new Promise(r => setTimeout(r, 260));
     }
@@ -2520,6 +2835,22 @@
     if (!res.ok) throw new Error("Reverse geocode failed");
     const data = await res.json();
     return data?.display_name || "";
+  }
+
+  async function reverseGeocodeDetails(lat, lng){
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, { headers: { "Accept":"application/json", "Accept-Language":"th-TH,th;q=0.9,en;q=0.7" } });
+    if (!res.ok) throw new Error("Reverse geocode failed");
+    const data = await res.json();
+    const address = data?.address || {};
+    return {
+      address: data?.display_name || "",
+      details: {
+        subdistrict: address.suburb || address.neighbourhood || address.quarter || address.village || "",
+        district: address.city_district || address.district || address.county || address.municipality || address.city || address.town || "",
+        province: address.province || address.state || address.region || ""
+      }
+    };
   }
 
   async function forwardGeocode(q){
@@ -2553,10 +2884,12 @@
     const lng = Number(lngEl.value);
     let msg = `Lat/Lng: ${lat.toFixed(6)}, ${lng.toFixed(6)} `;
 
-    if (state.settings.showAddress){
+    if (state.settings.showAddress || state.settings.showSubdistrict || state.settings.showDistrict || state.settings.showProvince){
       locStatus.textContent = msg + "กำลังดึงที่อยู่…";
       try{
-        state.addressText = await reverseGeocode(lat, lng);
+        const info = await reverseGeocodeDetails(lat, lng);
+        state.addressText = info.address;
+        state.settings.locationDetails = info.details;
         msg += `\nAddress: ${state.addressText || "(ไม่พบที่อยู่)"}`;
       } catch (e){
         msg += `\nAddress: (ดึงไม่ได้ — แนะนำเปิดผ่าน https)`;
@@ -2661,6 +2994,9 @@
   /* Events */
   btnTorch.addEventListener("click", toggleTorch);
   btnImport.addEventListener("click", () => { fileInput.value = ""; fileInput.click(); });
+  btnOpenNative.addEventListener("click", openNativeApp);
+  btnCancelAppInstall.addEventListener("click", () => closeBackdrop(appInstallBackdrop));
+  btnDownloadApp.addEventListener("click", downloadNativeApk);
   fileInput.addEventListener("change", (e) => {
     const files = Array.from(e.target.files || []);
     addPhotosFromFiles(files);
@@ -2773,13 +3109,37 @@
     scheduleSaveSettings();
     if (previewBackdrop.style.display === "flex") renderPreview();
   });
+  fontFamily.addEventListener("change", () => {
+    state.settings.fontFamily = fontFamily.value;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  [[fontWeight,"fontWeight",400],[strokeWidth,"strokeWidth",.4],[fontHeightScale,"fontHeightScale",1.05]].forEach(([el,key,fallback]) => el.addEventListener("input", () => {
+    state.settings[key] = Number(el.value) || fallback;
+    scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  }));
+  timeFrame.addEventListener("change", () => {
+    state.settings.timeFrame = textToFrame(timeFrame.value, state.settings.timeFrame);
+    timeFrame.value = frameToText(state.settings.timeFrame); scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  locationFrame.addEventListener("change", () => {
+    state.settings.locationFrame = textToFrame(locationFrame.value, state.settings.locationFrame);
+    locationFrame.value = frameToText(state.settings.locationFrame); scheduleSaveSettings();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  });
+  timeAlign.addEventListener("change", () => { state.settings.timeAlign=timeAlign.value; scheduleSaveSettings(); if(previewBackdrop.style.display==="flex") renderPreview(); });
+  locationAlign.addEventListener("change", () => { state.settings.locationAlign=locationAlign.value; scheduleSaveSettings(); if(previewBackdrop.style.display==="flex") renderPreview(); });
+  showRemark.addEventListener("change", () => { state.settings.showRemark=showRemark.checked; scheduleSaveSettings(); if(previewBackdrop.style.display==="flex") { photoRemarkCard.style.display=showRemark.checked?"grid":"none"; renderPreview(); } });
+  defaultRemark.addEventListener("input", () => { state.settings.defaultRemark=defaultRemark.value; scheduleSaveSettings(); });
 
   // Location
   enableLocation.addEventListener("change", async () => {
     state.settings.enableLocation = enableLocation.checked;
     scheduleSaveSettings();
     await refreshAddressIfNeeded();
-    if (previewBackdrop.style.display === "flex") renderPreview();
+    if (previewBackdrop.style.display === "flex") { photoLocationCard.style.display=enableLocation.checked?"grid":"none"; renderPreview(); }
   });
   showLatLng.addEventListener("change", async () => {
     state.settings.showLatLng = showLatLng.checked;
@@ -2891,6 +3251,23 @@
   // Preview modal
   btnClosePreview.addEventListener("click", closePreview);
   previewBackdrop.addEventListener("click", (e) => { if (e.target === previewBackdrop) closePreview(); });
+  previewCanvas.addEventListener("pointerdown", (e) => {
+    previewDrag = {x:e.clientX, y:e.clientY, panX:previewPanX, panY:previewPanY};
+    previewCanvas.setPointerCapture(e.pointerId);
+  });
+  previewCanvas.addEventListener("pointermove", (e) => {
+    if (!previewDrag) return;
+    previewPanX = previewDrag.panX + e.clientX - previewDrag.x;
+    previewPanY = previewDrag.panY + e.clientY - previewDrag.y;
+    applyPreviewTransform();
+  });
+  previewCanvas.addEventListener("pointerup", () => { previewDrag=null; });
+  previewCanvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    previewZoom = clamp(previewZoom * (e.deltaY < 0 ? 1.12 : .89), 1, 4);
+    if (previewZoom === 1) { previewPanX=0; previewPanY=0; }
+    applyPreviewTransform();
+  }, {passive:false});
 
   photoTimeNow.addEventListener("click", () => setPhotoTimeMode("now"));
   photoTimeCustom.addEventListener("click", () => setPhotoTimeMode("custom"));
@@ -2902,21 +3279,59 @@
     const d = v ? new Date(v) : new Date();
     p.timeValueISO = d.toISOString();
 
-    // ✅ persist
-    idbPutPhoto({
-      id: p.id,
-      baseBlob: p.baseBlob,
-      w: p.w,
-      h: p.h,
-      createdAtISO: p.createdAtISO,
-      timeMode: p.timeMode,
-      timeValueISO: p.timeValueISO,
-      sourceName: p.sourceName,
-      fromFrontMirror: p.fromFrontMirror
-    }).catch(e => addLog("idb update time failed: " + String(e?.message||e)));
+    persistPhotoToIDB(p);
 
     renderPreview();
   });
+  [[showSubdistrict,"showSubdistrict"],[showDistrict,"showDistrict"],[showProvince,"showProvince"]].forEach(([el,key]) => el.addEventListener("change", async () => {
+    state.settings[key] = el.checked; scheduleSaveSettings(); await refreshAddressIfNeeded();
+    if (previewBackdrop.style.display === "flex") renderPreview();
+  }));
+
+  btnSaveRemark.addEventListener("click", () => {
+    const p = getSelectedPhoto();
+    if (!p) return;
+    p.remark = photoRemark.value.trim();
+    persistPhotoToIDB(p).then(() => {
+      showToast(p.remark ? "บันทึก Remark แล้ว" : "ล้าง Remark แล้ว");
+      renderPreview();
+    });
+  });
+
+  async function savePhotoLocation({useCurrent=false, useGlobal=false} = {}){
+    const p = getSelectedPhoto();
+    if (!p) return;
+    try{
+      if (useCurrent){
+        if (!navigator.geolocation) throw new Error("เบราว์เซอร์ไม่รองรับตำแหน่ง");
+        photoLocationHint.textContent = "กำลังอ่านตำแหน่ง…";
+        const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {enableHighAccuracy:true, timeout:12000, maximumAge:0}));
+        photoLatitude.value = pos.coords.latitude.toFixed(7);
+        photoLongitude.value = pos.coords.longitude.toFixed(7);
+      } else if (useGlobal){
+        photoLatitude.value = latEl.value;
+        photoLongitude.value = lngEl.value;
+      }
+      const lat = toNumberOrNull(photoLatitude.value), lng = toNumberOrNull(photoLongitude.value);
+      if (lat===null || lng===null || lat < -90 || lat > 90 || lng < -180 || lng > 180) throw new Error("Lat/Lng ไม่ถูกต้อง");
+      p.locationLatitude = lat; p.locationLongitude = lng;
+      try{
+        const info = await reverseGeocodeDetails(lat, lng);
+        p.locationAddress = info.address;
+        p.locationDetails = info.details;
+      } catch { p.locationAddress = ""; p.locationDetails = {}; }
+      await persistPhotoToIDB(p);
+      photoLocationHint.textContent = "บันทึกตำแหน่งของรูปนี้แล้ว";
+      renderPreview();
+    } catch (e){
+      photoLocationHint.textContent = e?.message || "ไม่พบตำแหน่ง";
+      showToast("บันทึกตำแหน่งไม่สำเร็จ");
+    }
+    hideProgress();
+  }
+  btnPhotoLocationCurrent.addEventListener("click", () => savePhotoLocation({useCurrent:true}));
+  btnPhotoLocationGlobal.addEventListener("click", () => savePhotoLocation({useGlobal:true}));
+  btnSavePhotoLocation.addEventListener("click", () => savePhotoLocation());
 
   dlType.addEventListener("change", () => {
     dlQuality.disabled = (dlType.value === "image/png");
