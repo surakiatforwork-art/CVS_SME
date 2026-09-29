@@ -11,6 +11,8 @@ const CONFIG = {
   TIMEZONE: 'Asia/Bangkok',
   LAST_VISITED_HEADER: 'lastVisitedDate',
   NOTED_HEADER: 'noted',
+  REPORT_CONFIG_SHEET: '__REPORT_CONFIG',
+  REPORT_CONFIG_HEADERS: ['account', 'kind', 'id', 'sort', 'active', 'data', 'updatedAt'],
   PLACES_SCHEMA_VERSION: 3,
 };
 
@@ -44,6 +46,18 @@ function doGet(e) {
       case 'updateLocation':
         result = api_updateLocation_(p.id, p.lat, p.lng, p.sheet);
         break;
+      case 'getReportConfig':
+        result = api_getReportConfig_(p.account);
+        break;
+      case 'getReportConfigMeta':
+        result = api_getReportConfigMeta_(p.account);
+        break;
+      case 'saveReportConfigItem':
+        result = api_saveReportConfigItem_(p.account, p.kind, p.id, p.sort, p.active, p.data);
+        break;
+      case 'deleteReportConfigItem':
+        result = api_deleteReportConfigItem_(p.account, p.kind, p.id);
+        break;
       default:
         result = { ok: false, message: 'Unknown action: ' + action };
         break;
@@ -73,6 +87,142 @@ function api_getSheets_() {
   const sheets = getUsableSheetNames_(ss);
   const def = (sheets.indexOf(CONFIG.SHEET_NAME) !== -1) ? CONFIG.SHEET_NAME : ((sheets && sheets.length) ? sheets[0] : CONFIG.SHEET_NAME);
   return { ok: true, defaultSheet: def, sheets };
+}
+
+function doPost(e) {
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (body.action === 'saveReportConfigBulk') return output_(api_saveReportConfigBulk_(body.items, body.requestId), '');
+    return output_({ ok: false, message: 'Unknown POST action' }, '');
+  } catch (err) {
+    return output_({ ok: false, message: (err && err.message) ? err.message : String(err) }, '');
+  }
+}
+
+function getReportConfigSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(CONFIG.REPORT_CONFIG_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.REPORT_CONFIG_SHEET);
+    sheet.getRange(1, 1, 1, CONFIG.REPORT_CONFIG_HEADERS.length).setValues([CONFIG.REPORT_CONFIG_HEADERS]);
+  }
+  // Keep the config table visible so the owner can audit it directly in Google Sheets.
+  if (sheet.isSheetHidden && sheet.isSheetHidden()) sheet.showSheet();
+  return sheet;
+}
+
+function reportConfigAccountKey_(account) {
+  return safeStr_(account).toUpperCase().replace(/[^\wก-๙]/g, '_') || 'DEFAULT';
+}
+
+function reportConfigCacheKey_(account, version) {
+  return 'report_config_v2_' + reportConfigAccountKey_(account) + '_rev_' + String(version);
+}
+
+function reportConfigRequestKey_(account) {
+  return 'REPORT_CONFIG_REQUEST_' + reportConfigAccountKey_(account);
+}
+
+function api_getReportConfigMeta_(accountParam) {
+  const account = safeStr_(accountParam);
+  const props = PropertiesService.getScriptProperties();
+  let lastRequest = {};
+  try { lastRequest = JSON.parse(props.getProperty(reportConfigRequestKey_(account)) || '{}'); } catch (_) {}
+  return {
+    ok: true,
+    account,
+    version: getRev_(CONFIG.REPORT_CONFIG_SHEET),
+    lastRequestId: safeStr_(lastRequest.id),
+    updatedAt: safeStr_(lastRequest.updatedAt),
+  };
+}
+
+function api_getReportConfig_(accountParam) {
+  const account = safeStr_(accountParam);
+  const version = getRev_(CONFIG.REPORT_CONFIG_SHEET);
+  const cache = CacheService.getScriptCache();
+  const cacheKey = reportConfigCacheKey_(account, version);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+  const sheet = getReportConfigSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    const empty = { ok: true, account, items: [], version };
+    try { cache.put(cacheKey, JSON.stringify(empty), 21600); } catch (_) {}
+    return empty;
+  }
+  const rows = sheet.getRange(2, 1, lastRow - 1, CONFIG.REPORT_CONFIG_HEADERS.length).getValues();
+  const items = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (safeStr_(row[0]).toUpperCase() !== account.toUpperCase()) continue;
+    try {
+      items.push({ account: safeStr_(row[0]), kind: safeStr_(row[1]), id: safeStr_(row[2]), sort: Number(row[3]) || 0, active: String(row[4]) !== '0', data: JSON.parse(String(row[5] || '{}')) });
+    } catch (_) {}
+  }
+  const result = { ok: true, account, items, version };
+  try { cache.put(cacheKey, JSON.stringify(result), 21600); } catch (_) {}
+  return result;
+}
+
+function api_saveReportConfigItem_(accountParam, kindParam, idParam, sortParam, activeParam, dataParam) {
+  const account = safeStr_(accountParam), kind = safeStr_(kindParam), id = safeStr_(idParam);
+  if (!account || !kind || !id) return { ok: false, message: 'Missing account, kind, or id' };
+  let data;
+  try { data = JSON.parse(String(dataParam || '{}')); } catch (_) { return { ok: false, message: 'Invalid config data' }; }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  try {
+    const sheet = getReportConfigSheet_();
+    const lastRow = sheet.getLastRow();
+    const rows = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    let rowIndex = 0;
+    for (let i = 0; i < rows.length; i++) if (safeStr_(rows[i][0]) === account && safeStr_(rows[i][1]) === kind && safeStr_(rows[i][2]) === id) { rowIndex = i + 2; break; }
+    const row = [[account, kind, id, Number(sortParam) || 0, String(activeParam) === 'false' || String(activeParam) === '0' ? 0 : 1, JSON.stringify(data), new Date().toISOString()]];
+    if (rowIndex) sheet.getRange(rowIndex, 1, 1, row[0].length).setValues(row); else sheet.appendRow(row[0]);
+    return { ok: true, id, version: bumpRev_(CONFIG.REPORT_CONFIG_SHEET) };
+  } finally { lock.releaseLock(); }
+}
+
+function api_deleteReportConfigItem_(accountParam, kindParam, idParam) {
+  const account = safeStr_(accountParam), kind = safeStr_(kindParam), id = safeStr_(idParam);
+  const sheet = getReportConfigSheet_(), lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { ok: true };
+  const rows = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  for (let i = 0; i < rows.length; i++) if (safeStr_(rows[i][0]) === account && safeStr_(rows[i][1]) === kind && safeStr_(rows[i][2]) === id) { sheet.deleteRow(i + 2); return { ok: true, version: bumpRev_(CONFIG.REPORT_CONFIG_SHEET) }; }
+  return { ok: true };
+}
+
+function api_saveReportConfigBulk_(items, requestIdParam) {
+  if (!Array.isArray(items) || !items.length) return { ok: false, message: 'Missing config items' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return { ok: false, message: 'มีรายการอื่นกำลังบันทึก กรุณาลองอีกครั้ง' };
+  try {
+    const sheet = getReportConfigSheet_();
+    const accounts = {};
+    items.forEach(function(item) { accounts[safeStr_(item.account)] = true; });
+    const rows = items.map(function(item) {
+      const account = safeStr_(item.account), kind = safeStr_(item.kind), id = safeStr_(item.id);
+      if (!account || !kind || !id) throw new Error('Invalid config item');
+      return [account, kind, id, Number(item.sort) || 0, item.active === false ? 0 : 1, JSON.stringify(item.data || {}), new Date().toISOString()];
+    });
+    const lastRow = sheet.getLastRow();
+    const existing = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, CONFIG.REPORT_CONFIG_HEADERS.length).getValues() : [];
+    const kept = existing.filter(function(row) { return !accounts[safeStr_(row[0])]; });
+    const allRows = kept.concat(rows);
+    // Write replacement rows first so readers never see an empty config table.
+    sheet.getRange(2, 1, allRows.length, CONFIG.REPORT_CONFIG_HEADERS.length).setValues(allRows);
+    if (lastRow - 1 > allRows.length) sheet.getRange(2 + allRows.length, 1, lastRow - 1 - allRows.length, CONFIG.REPORT_CONFIG_HEADERS.length).clearContent();
+    const version = bumpRev_(CONFIG.REPORT_CONFIG_SHEET);
+    const requestId = safeStr_(requestIdParam);
+    const props = PropertiesService.getScriptProperties();
+    Object.keys(accounts).forEach(function(account) {
+      props.setProperty(reportConfigRequestKey_(account), JSON.stringify({ id: requestId, updatedAt: new Date().toISOString() }));
+    });
+    return { ok: true, count: rows.length, version, requestId };
+  } finally { lock.releaseLock(); }
 }
 
 function api_getPlaces_(sheetParam) {
