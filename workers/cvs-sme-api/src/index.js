@@ -194,7 +194,15 @@ async function getTeams(env) {
   const allowedTeams = parseAllowlist(env.ALLOWED_TEAMS);
   const teams = results.filter(r => !allowedTeams.length || allowedTeams.includes(String(r.team_id)))
     .map(r => ({ id: r.team_id, name: r.name }));
-  return json({ ok: true, defaultTeamId: teams[0]?.id || "", teams });
+  if (allowedTeams.length) {
+    const order = new Map(allowedTeams.map((id,index) => [id,index]));
+    teams.sort((a,b) => (order.get(String(a.id)) ?? 9999) - (order.get(String(b.id)) ?? 9999));
+  }
+  const configuredDefault = String(env.DEFAULT_TEAM_ID || "").trim();
+  const defaultTeamId = teams.some(team => String(team.id) === configuredDefault)
+    ? configuredDefault
+    : (teams[0]?.id || "");
+  return json({ ok: true, defaultTeamId, teams });
 }
 
 async function getStores(env, teamId) {
