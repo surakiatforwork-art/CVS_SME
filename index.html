@@ -1789,6 +1789,8 @@
   </div>
 </div>
 
+<script src="Tools/worker-auth.js"></script>
+<script src="Tools/backend-client.js"></script>
 <script>
   const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec',
@@ -1817,6 +1819,7 @@
   const CACHE_KEY_BASE = 'PT_GBKK_PLACES_CACHE_V3';
   const MAPSTATE_KEY = 'PT_GBKK4_MAPSTATE_V1';
   const VISIT_OUTBOX_KEY = 'PT_GBKK_VISIT_OUTBOX_V1';
+  const NOTED_OUTBOX_KEY = 'PT_GBKK_NOTED_OUTBOX_V1';
 
   function $(id){ return document.getElementById(id); }
 
@@ -2054,13 +2057,13 @@
     return base + (base.indexOf('?') >= 0 ? '&' : '?') + qs;
   }
 
-  async function apiGetSheets(){
+  async function legacyApiGetSheets(){
     var url = apiUrl('getSheets');
     if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
     return await jsonpWithRetry(url, 30000, 1);
   }
 
-  async function apiGetPlaces(sheetName){
+  async function legacyApiGetPlaces(sheetName){
     var params = {};
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('getPlaces', params);
@@ -2094,6 +2097,25 @@
     if(REPORT_CONFIG_WARMING[accountKey]) return REPORT_CONFIG_WARMING[accountKey];
 
     var cached = readReportConfigCache_(accountKey);
+    if(BACKEND_CLIENT && BACKEND_CLIENT.mode() === "worker"){
+      var workerWork = BACKEND_CLIENT.getReportConfig(accountKey).then(function(result){
+        if(!result || !result.ok || !Array.isArray(result.items)){
+          throw new Error((result && (result.message || result.error)) || "โหลด config รายงานไม่สำเร็จ");
+        }
+        if(cached && String(cached.version ?? "") === String(result.version ?? "")){
+          return { version:result.version, verified:true, changed:false };
+        }
+        writeReportConfigCache_(accountKey, result);
+        return { version:result.version, verified:true, changed:true };
+      }).catch(function(){
+        return { version:cached ? cached.version : null, verified:false, changed:false };
+      }).finally(function(){
+        delete REPORT_CONFIG_WARMING[accountKey];
+      });
+      REPORT_CONFIG_WARMING[accountKey] = workerWork;
+      return workerWork;
+    }
+
     var metaUrl = apiUrl('getReportConfigMeta', { account: accountKey });
     if(!metaUrl) return Promise.resolve({ version: cached ? cached.version : null, verified:false, changed:false });
 
@@ -2121,7 +2143,7 @@
     return work;
   }
 
-  async function apiMarkVisited(id, sheetName){
+  async function legacyApiMarkVisited(id, sheetName){
     var params = { id:id };
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('markVisited', params);
@@ -2129,7 +2151,7 @@
     return await jsonp(url, 30000);
   }
 
-  async function apiResetVisitedAll(sheetName){
+  async function legacyApiResetVisitedAll(sheetName){
     var params = {};
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('resetVisitedAll', params);
@@ -2137,7 +2159,7 @@
     return await jsonp(url, 30000);
   }
 
-  async function apiSaveNoted(id, noted, sheetName){
+  async function legacyApiSaveNoted(id, noted, sheetName){
     var params = { id:id, noted:noted };
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('saveNoted', params);
@@ -2210,7 +2232,7 @@
     if(!copied) throw new Error('คัดลอกไม่สำเร็จ');
   }
 
-  async function apiUpdateRoute(id, route, sheetName){
+  async function legacyApiUpdateRoute(id, route, sheetName){
     var params = { id:id, route:route };
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('updateRoute', params);
@@ -2218,13 +2240,44 @@
     return await jsonp(url, 30000);
   }
 
-  async function apiUpdateLocation(id, lat, lng, sheetName){
+  async function legacyApiUpdateLocation(id, lat, lng, sheetName){
     var params = { id:id, lat:lat, lng:lng };
     if(sheetName) params.sheet = sheetName;
     var url = apiUrl('updateLocation', params);
     if(!url) return { ok:false, message:'ยังไม่ได้ตั้งค่า CONFIG.API_URL' };
     return await jsonp(url, 30000);
   }
+
+  // Production Worker access uses short-lived browser sessions.
+  // Service credentials are never embedded in this page.
+  function createBackendClient_(){
+    var pilot = window.__PT_WORKER_PILOT__ || {};
+    var wantsWorker = pilot.mode === 'worker' && typeof pilot.getAuthorization === 'function';
+    return window.PTBackendClient.create({
+      mode:wantsWorker ? 'worker' : 'apps-script',
+      workerUrl:'https://cvs-sme-api.surakiat16082000.workers.dev',
+      getAuthorization:wantsWorker ? pilot.getAuthorization : null,
+      clearAuthorization:wantsWorker ? pilot.clearAuthorization : null,
+      legacy:{
+        listTeams:legacyApiGetSheets,
+        getPlaces:legacyApiGetPlaces,
+        markVisited:legacyApiMarkVisited,
+        resetVisits:legacyApiResetVisitedAll,
+        saveNoted:legacyApiSaveNoted,
+        updateRoute:legacyApiUpdateRoute,
+        updateLocation:legacyApiUpdateLocation
+      }
+    });
+  }
+
+  var BACKEND_CLIENT = createBackendClient_();
+  function apiGetSheets(){ return BACKEND_CLIENT.listTeams(); }
+  function apiGetPlaces(sheetName){ return BACKEND_CLIENT.getPlaces(sheetName); }
+  function apiMarkVisited(id, sheetName, requestId){ return BACKEND_CLIENT.markVisited(id, sheetName, requestId); }
+  function apiResetVisitedAll(sheetName, requestId){ return BACKEND_CLIENT.resetVisits(sheetName, requestId); }
+  function apiSaveNoted(id, noted, sheetName, requestId){ return BACKEND_CLIENT.saveNoted(id, noted, sheetName, requestId); }
+  function apiUpdateRoute(id, route, sheetName, requestId){ return BACKEND_CLIENT.updateRoute(id, route, sheetName, requestId); }
+  function apiUpdateLocation(id, lat, lng, sheetName, requestId){ return BACKEND_CLIENT.updateLocation(id, lat, lng, sheetName, requestId); }
 
   $('routeEditSave').addEventListener('click', saveRouteEditor_);
   $('locationEditSave').addEventListener('click', saveLocationEditor_);
@@ -2667,8 +2720,10 @@
   var PLACES = [];
   var PENDING = new Map();
   var VISIT_SYNC_PROMISE = null;
+  var NOTED_SYNC_PROMISE = null;
   // Keep manual refresh single-flight so repeated taps cannot stack API/GPS work.
   var REFRESH_PROMISE = null;
+  var AUTO_REFRESH_PROMISE = null;
 
   function routeSummaryPlaces_(){
     var route = $('routeFilter') ? String($('routeFilter').value || '') : '';
@@ -3985,20 +4040,37 @@
     var tries = 0;
     var maxTries = 50;
     var interval = 120;
+    var applying = false;
 
-    var t = setInterval(function(){
+    var t = setInterval(async function(){
+      if(applying) return;
       tries++;
-      if(!REPORT_PREFILL_ACKED && tries <= 12){
-        postReportPrefillMessage_(payload);
-      }
       tryTrimReportUI();
       patchReportEmbedStorageOnce();
       attachCopyHistoryHookOnce();
 
-      var ok = prefillReportOnce(payload);
-      if(ok || tries >= maxTries){
+      var win = getReportWin();
+      if(win && typeof win.__PT_APPLY_PREFILL === 'function'){
+        applying = true;
+        try{
+          await win.__PT_APPLY_PREFILL(payload);
+          REPORT_PREFILL_ACKED = true;
+          setReportOverlayLoading_('repOverlay', false);
+          clearInterval(t);
+          return;
+        }catch(e){
+          applying = false;
+        }
+      }else if(!REPORT_PREFILL_ACKED && tries <= 12){
+        postReportPrefillMessage_(payload);
+      }
+
+      if(REPORT_PREFILL_ACKED || tries >= maxTries){
         clearInterval(t);
-        if(!ok){ showToast('Prefill ไม่เจอช่องใน Report.html (ปล่อยว่างไว้)'); }
+        if(!REPORT_PREFILL_ACKED){
+          setReportOverlayLoading_('repOverlay', false);
+          showToast('โหลดข้อมูล Report ไม่สำเร็จ ลองเปิดใหม่อีกครั้ง');
+        }
       }
     }, interval);
   }
@@ -4346,6 +4418,13 @@
     return String(item && item.sheetName || '').trim() + '|' + String(item && item.id || '').trim();
   }
 
+  function outboxRequestId_(prefix){
+    var random = '';
+    try{ random = crypto && crypto.randomUUID ? crypto.randomUUID() : ''; }catch(e){}
+    if(!random) random = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    return String(prefix || 'pt') + '-' + random;
+  }
+
   function readVisitOutbox_(){
     try{
       var raw = localStorage.getItem(VISIT_OUTBOX_KEY);
@@ -4353,17 +4432,22 @@
       if(!Array.isArray(source)) return [];
       var seen = {};
       var out = [];
+      var migrated = false;
       source.forEach(function(item){
+        var requestId = String(item && item.requestId || '').trim();
+        if(!requestId){ requestId = outboxRequestId_('visit'); migrated = true; }
         var normalized = {
           id: String(item && item.id || '').trim(),
           sheetName: String(item && item.sheetName || '').trim(),
-          createdAt: Number(item && item.createdAt || 0) || Date.now()
+          createdAt: Number(item && item.createdAt || 0) || Date.now(),
+          requestId: requestId
         };
         var key = visitOutboxKey_(normalized);
         if(!normalized.id || !normalized.sheetName || seen[key]) return;
         seen[key] = true;
         out.push(normalized);
       });
+      if(migrated) writeVisitOutbox_(out);
       return out;
     }catch(e){ return []; }
   }
@@ -4376,9 +4460,10 @@
   function updateSyncButton_(){
     var btn = $('btnSync');
     if(!btn) return;
-    var count = readVisitOutbox_().length;
-    btn.disabled = !!VISIT_SYNC_PROMISE;
-    btn.textContent = VISIT_SYNC_PROMISE ? 'Sync…' : (count ? 'Sync ' + count : 'Sync');
+    var count = readVisitOutbox_().length + readNotedOutbox_().length;
+    var syncing = !!VISIT_SYNC_PROMISE || !!NOTED_SYNC_PROMISE;
+    btn.disabled = syncing;
+    btn.textContent = syncing ? 'Sync…' : (count ? 'Sync ' + count : 'Sync');
   }
 
   function updateRefreshButton_(){
@@ -4402,8 +4487,18 @@
     return REFRESH_PROMISE;
   }
 
+  function autoRefreshPlaces_(){
+    if(AUTO_REFRESH_PROMISE || REFRESH_PROMISE) return AUTO_REFRESH_PROMISE;
+    if(document.visibilityState === 'hidden' || navigator.onLine === false) return null;
+    if(!String(CURRENT_SHEET || '') || PENDING.size) return null;
+    AUTO_REFRESH_PROMISE = loadPlaces({ force:false, silent:true }).finally(function(){
+      AUTO_REFRESH_PROMISE = null;
+    });
+    return AUTO_REFRESH_PROMISE;
+  }
+
   function queueVisitForSync_(placeId, sheetName){
-    var item = { id:String(placeId || '').trim(), sheetName:String(sheetName || '').trim(), createdAt:Date.now() };
+    var item = { id:String(placeId || '').trim(), sheetName:String(sheetName || '').trim(), createdAt:Date.now(), requestId:outboxRequestId_('visit') };
     if(!item.id || !item.sheetName) return false;
     var items = readVisitOutbox_();
     var key = visitOutboxKey_(item);
@@ -4438,6 +4533,82 @@
     return Object.assign({}, result, { places:places, visited:visited, remaining:Math.max(0, Number(result.total || places.length) - visited) });
   }
 
+  function notedOutboxKey_(item){
+    return String(item && item.sheetName || '').trim() + '|' + String(item && item.id || '').trim();
+  }
+
+  function readNotedOutbox_(){
+    try{
+      var source = JSON.parse(localStorage.getItem(NOTED_OUTBOX_KEY) || '[]');
+      if(!Array.isArray(source)) return [];
+      var byKey = {};
+      var migrated = false;
+      source.forEach(function(item){
+        var requestId = String(item && item.requestId || '').trim();
+        if(!requestId){ requestId = outboxRequestId_('noted'); migrated = true; }
+        var normalized = {
+          id: String(item && item.id || '').trim(),
+          sheetName: String(item && item.sheetName || '').trim(),
+          noted: String(item && item.noted || ''),
+          createdAt: Number(item && item.createdAt || 0) || Date.now(),
+          requestId: requestId
+        };
+        var key = notedOutboxKey_(normalized);
+        if(!normalized.id || !normalized.sheetName || !normalized.noted) return;
+        // Later records are the latest state for that same store.
+        if(!byKey[key] || byKey[key].createdAt <= normalized.createdAt) byKey[key] = normalized;
+      });
+      var out = Object.keys(byKey).map(function(key){ return byKey[key]; });
+      if(migrated) writeNotedOutbox_(out);
+      return out;
+    }catch(e){ return []; }
+  }
+
+  function writeNotedOutbox_(items){
+    return setLocalStorageRecover_(NOTED_OUTBOX_KEY, JSON.stringify(Array.isArray(items) ? items : []), [NOTED_OUTBOX_KEY]);
+  }
+
+  function queueNotedForSync_(placeId, notedStr, sheetName){
+    var item = {
+      id: String(placeId || '').trim(),
+      sheetName: String(sheetName || '').trim(),
+      noted: String(notedStr || ''),
+      createdAt: Date.now(),
+      requestId: outboxRequestId_('noted')
+    };
+    if(!item.id || !item.sheetName || !item.noted) return false;
+    var key = notedOutboxKey_(item);
+    var items = readNotedOutbox_().filter(function(existing){ return notedOutboxKey_(existing) !== key; });
+    items.push(item);
+    var saved = writeNotedOutbox_(items);
+    updateSyncButton_();
+    return saved;
+  }
+
+  function removeNotedFromOutbox_(placeId, sheetName, notedStr){
+    var key = notedOutboxKey_({ id:placeId, sheetName:sheetName });
+    var items = readNotedOutbox_().filter(function(item){
+      // Do not remove a newer edit that arrived while this API request was in flight.
+      return notedOutboxKey_(item) !== key || String(item.noted) !== String(notedStr);
+    });
+    writeNotedOutbox_(items);
+    updateSyncButton_();
+  }
+
+  function applyNotedOutboxToResult_(result, sheetName){
+    if(!result || !Array.isArray(result.places)) return result;
+    var pending = readNotedOutbox_().filter(function(item){ return item.sheetName === String(sheetName || ''); });
+    if(!pending.length) return result;
+    var byId = {};
+    pending.forEach(function(item){ byId[item.id] = item.noted; });
+    return Object.assign({}, result, {
+      places: result.places.map(function(place){
+        var noted = byId[String(place && place.id || '')];
+        return noted === undefined ? place : Object.assign({}, place, { noted:noted });
+      })
+    });
+  }
+
   async function syncVisitOutbox_(manual){
     if(VISIT_SYNC_PROMISE) return VISIT_SYNC_PROMISE;
     var queued = readVisitOutbox_();
@@ -4453,7 +4624,7 @@
       for(var index=0; index<queued.length; index++){
         var item = queued[index];
         try{
-          var res = await enqueueSheetWrite_(function(){ return apiMarkVisited(item.id, item.sheetName); }, 0);
+          var res = await enqueueSheetWrite_(function(){ return apiMarkVisited(item.id, item.sheetName, item.requestId); }, 0);
           if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'Sync ไม่สำเร็จ');
           removeVisitFromOutbox_(item.id, item.sheetName);
           sent++;
@@ -4471,6 +4642,54 @@
     });
     updateSyncButton_();
     return VISIT_SYNC_PROMISE;
+  }
+
+  async function syncNotedOutbox_(manual){
+    if(NOTED_SYNC_PROMISE) return NOTED_SYNC_PROMISE;
+    var queued = readNotedOutbox_();
+    if(!queued.length){
+      updateSyncButton_();
+      return { sent:0, failed:false };
+    }
+
+    NOTED_SYNC_PROMISE = (async function(){
+      var sent = 0;
+      var failed = false;
+      for(var index=0; index<queued.length; index++){
+        var item = queued[index];
+        try{
+          var res = await enqueueSheetWrite_(function(){ return apiSaveNoted(item.id, item.noted, item.sheetName, item.requestId); }, 0);
+          if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'Sync report ไม่สำเร็จ');
+          removeNotedFromOutbox_(item.id, item.sheetName, item.noted);
+          sent++;
+        }catch(error){
+          failed = true;
+          console.warn('report noted sync failed:', error);
+          break;
+        }
+      }
+      if(sent && String(CURRENT_SHEET || '')) schedulePlacesRevalidate_(CURRENT_SHEET);
+      return { sent:sent, failed:failed };
+    })().finally(function(){
+      NOTED_SYNC_PROMISE = null;
+      updateSyncButton_();
+    });
+    updateSyncButton_();
+    return NOTED_SYNC_PROMISE;
+  }
+
+  async function syncAllOutboxes_(manual){
+    var before = readVisitOutbox_().length + readNotedOutbox_().length;
+    if(!before){
+      if(manual) showToast('ไม่มีรายการรอ Sync');
+      updateSyncButton_();
+      return;
+    }
+    await Promise.all([syncVisitOutbox_(false), syncNotedOutbox_(false)]);
+    if(manual){
+      var left = readVisitOutbox_().length + readNotedOutbox_().length;
+      showToast(left ? ('Sync แล้ว เหลือรอส่ง ' + left + ' รายการ') : 'Sync สำเร็จ');
+    }
   }
 
   function todayYmdLocal_(){
@@ -4573,25 +4792,8 @@
   }
 
   async function saveNotedToApiSilent_(placeId, notedStr, sheetName){
-    try{
-      var res = await enqueueSheetWrite_(function(){
-        return apiSaveNoted(placeId, notedStr, sheetName);
-      });
-      if(!res || !res.ok){
-        if(!REPORT_NOTED_SAVE_WARNED){
-          REPORT_NOTED_SAVE_WARNED = true;
-          console.warn('saveNoted failed:', res);
-        }
-        return false;
-      }
-      return true;
-    }catch(err){
-      if(!REPORT_NOTED_SAVE_WARNED){
-        REPORT_NOTED_SAVE_WARNED = true;
-        console.warn('saveNoted error (backend timeout or unreachable):', err);
-      }
-      return false;
-    }
+    // The durable outbox owns retry and removal only after Apps Script confirms success.
+    return syncNotedOutbox_(false);
   }
 
   function persistReportNotedFromPayload_(payload){
@@ -4612,9 +4814,10 @@
       return false;
     }
 
+    // Persist first. This also protects the short interval before an iframe postMessage
+    // is processed and keeps a newer local edit from being overwritten by Sheet data.
+    queueNotedForSync_(placeId, notedStr, sheetName);
     updateLocalNotedState_(placeId, notedStr, sheetName);
-
-    // Fire-and-forget: keep copy flow smooth even before backend is updated.
     saveNotedToApiSilent_(placeId, notedStr, sheetName);
     return true;
   }
@@ -4633,7 +4836,7 @@
     var cached = cacheRead_(sheetName);
     if(!cached || !cached.payload) return false;
 
-    var res = applyVisitOutboxToResult_(cached.payload, sheetName);
+    var res = applyNotedOutboxToResult_(applyVisitOutboxToResult_(cached.payload, sheetName), sheetName);
     if(!res || !res.ok) return false;
 
     META = {
@@ -4660,14 +4863,15 @@
   async function doLoadPlaces_(opts){
     opts = opts || {};
     var forceSpinner = !!opts.force;
+    var silent = !!opts.silent;
     var sheetAtCall = CURRENT_SHEET || '';
     var usedCache = false;
 
     if(forceSpinner || (!PLACES || PLACES.length === 0)){
       usedCache = renderFromCacheIfAny_(sheetAtCall);
       if(!usedCache) showLoading();
-      else $('badgeText').textContent = 'กำลังอัปเดท…';
-    }else{
+      else if(!silent) $('badgeText').textContent = 'กำลังอัปเดท…';
+    }else if(!silent){
       $('badgeText').textContent = 'กำลังอัปเดท…';
     }
 
@@ -4689,7 +4893,7 @@
         return;
       }
 
-      res = applyVisitOutboxToResult_(res, sheetAtCall);
+      res = applyNotedOutboxToResult_(applyVisitOutboxToResult_(res, sheetAtCall), sheetAtCall);
       META = {
         total: (res && res.total) ? res.total : 0,
         visited: (res && res.visited) ? res.visited : 0,
@@ -5050,8 +5254,9 @@
     var sheetAtCall = CURRENT_SHEET || '';
 
     try{
+      var resetRequestId = outboxRequestId_('reset');
       var res = await enqueueSheetWrite_(function(){
-        return apiResetVisitedAll(sheetAtCall);
+        return apiResetVisitedAll(sheetAtCall, resetRequestId);
       });
       if(!res || !res.ok){
         showToast(res && res.message ? res.message : 'ล้างไม่สำเร็จ');
@@ -5121,7 +5326,7 @@
     showToast('กำลังรีเฟรช…');
   };
 
-  $('btnSync').onclick = function(){ syncVisitOutbox_(true); };
+  $('btnSync').onclick = function(){ syncAllOutboxes_(true); };
 
   $('btnResetAll').onclick = onResetAll;
 
@@ -5139,6 +5344,16 @@
       try{ map.invalidateSize(); }catch(e){}
     }
   });
+
+  window.addEventListener('online', function(){
+    syncAllOutboxes_(false);
+    autoRefreshPlaces_();
+  });
+  window.addEventListener('focus', function(){ autoRefreshPlaces_(); });
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') autoRefreshPlaces_();
+  });
+  setInterval(function(){ autoRefreshPlaces_(); }, 60000);
 
   window.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
@@ -5187,7 +5402,7 @@
   renderRouteList_();
   bootSheets_().then(function(){
     loadPlaces({ force:true });
-    syncVisitOutbox_(false);
+    syncAllOutboxes_(false);
   });
   requestGPS();
   syncPageFromHash();

@@ -1,0 +1,3 @@
+workers/**/.wrangler/
+workers/**/.dev.vars
+.wrangler/

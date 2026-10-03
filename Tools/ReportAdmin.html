@@ -19,9 +19,20 @@
 </main>
 <div class="modal" id="modal"><form class="sheet" id="form"><div class="row"><h2 class="grow" id="formTitle">เพิ่มรายการ</h2><button type="button" class="soft" id="close">ปิด</button></div><div class="grid"><label class="wide">ชื่อรายการ<input id="label" required maxlength="160"></label><label id="familyWrap">ประเภท<select id="family"><option value="SME">SME</option><option value="DEN">DEN</option></select></label><label id="categoryWrap">หมวดในฟอร์ม<select id="category" required><option value="" disabled selected>เลือกหมวดหมู่</option><option value="📍สินค้าโฟม SMOOTHE">📍สินค้าโฟม SMOOTHE</option><option value="📍สินค้าครีม SMOOTHE">📍สินค้าครีม SMOOTHE</option><option value="📍สินค้ายาสีฟัน DENTISTE">📍สินค้ายาสีฟัน DENTISTE</option><option value="📍สินค้าแปรงสีฟัน DENTISTE">📍สินค้าแปรงสีฟัน DENTISTE</option></select></label><label id="formSortWrap">ลำดับใน popup<input id="formSort" type="number" min="0" value="10"></label><label id="sortWrap">ลำดับในรายงาน<input id="sort" type="number" min="0" value="10"></label><label id="flagWrap">ค่าเริ่มต้น<select id="defaultFlag"><option value="">ว่าง</option><option value="focus">⭐</option><option value="skip">❌</option></select></label></div><div class="actions" style="margin-top:16px"><button class="grow" type="submit">บันทึก</button><button type="button" class="danger" id="remove">ลบรายการ</button></div></form></div>
 <div class="loadingOverlay" id="loadingOverlay" role="status" aria-live="polite" aria-label="กำลังโหลดข้อมูลรายการ"><main class="loadingPage"><div class="loadingHeader"><div><div class="skeleton skeletonTitle"></div><div class="skeleton skeletonHint"></div></div><div class="loadingTitle"><span class="loadingSpinner"></span><span id="loadingHint">กำลังโหลด...</span></div></div><section class="loadingCard"><div class="skeleton skeletonSelect"></div><div class="skeletonActions"><div class="skeleton skeletonButton"></div><div class="skeleton skeletonButton"></div></div></section><section class="loadingCard"><div class="skeletonTabs"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="skeletonList"><div class="skeletonRow"><div class="skeleton skeletonBadge"></div><div class="skeleton skeletonText"></div></div><div class="skeletonRow"><div class="skeleton skeletonBadge"></div><div class="skeleton skeletonText short"></div></div><div class="skeletonRow"><div class="skeleton skeletonBadge"></div><div class="skeleton skeletonText"></div></div><div class="skeletonRow"><div class="skeleton skeletonBadge"></div><div class="skeleton skeletonText short"></div></div><div class="skeletonRow"><div class="skeleton skeletonBadge"></div><div class="skeleton skeletonText"></div></div></div></section><div class="skeleton skeletonFab"></div></main></div>
+<script src="worker-auth.js"></script>
+<script src="backend-client.js"></script>
 <script>
 (() => {
   const API_URL = 'https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec';
+  const USE_WORKER = new URLSearchParams(location.search).get('backend') !== 'legacy';
+  const CONFIG_VERSIONS = Object.create(null);
+  const ADMIN_CLIENT = USE_WORKER ? PTBackendClient.create({
+    mode:'worker',
+    workerUrl:PTWorkerAuth.workerUrl,
+    getAuthorization:()=>PTWorkerAuth.getAuthorization('admin'),
+    clearAuthorization:PTWorkerAuth.clearSession,
+    legacy:{}
+  }) : null;
   const $ = id => document.getElementById(id); const STORE='PT_REPORT_ADMIN_DRAFT_V1'; const ACCOUNT_STORE='PT_REPORT_ADMIN_LAST_ACCOUNT_V1'; const SKU_CATEGORIES=['📍สินค้าโฟม SMOOTHE','📍สินค้าครีม SMOOTHE','📍สินค้ายาสีฟัน DENTISTE','📍สินค้าแปรงสีฟัน DENTISTE']; let kind='sku', items=[], editing=null, syncing=false, reordering=false, dragState=null, reorderSnapshot=null; let drafts=JSON.parse(localStorage.getItem(STORE)||'{}');
   const lastAccount=localStorage.getItem(ACCOUNT_STORE);if([...$('account').options].some(option=>option.value===lastAccount))$('account').value=lastAccount;
   const BUILTIN = {
@@ -42,7 +53,18 @@
   function account(){return $('account').value} function itemOrder(item){return kind==='sku'?(Number((item.data||{}).formSort)||item.sort):item.sort} function visible(){return items.filter(x=>x.kind===kind).sort((a,b)=>itemOrder(a)-itemOrder(b))} function labelForKind(){return kind==='sku'?'สินค้า':kind==='summary'?'หัวข้อสรุปท้ายงาน':'สื่อโปรโมชั่น'}
   function includeBuiltin(){for(const [type,rows] of Object.entries(BUILTIN))for(const [id,label] of rows)if(!items.some(x=>x.kind===type&&x.id===id))items.push({account:account(),kind:type,id,sort:rows.findIndex(x=>x[0]===id)+1,active:true,data:{label},builtin:true})}
   function persist(){items=items.map((item)=>({...item,account:account()}));drafts[account()]={items,updatedAt:Date.now(),requestId:drafts[account()]?.requestId||''};localStorage.setItem(STORE,JSON.stringify(drafts));status('บันทึกในเครื่องแล้ว · รอ Sync')}
-  async function load(force=false){const local=drafts[account()];if(local&&!force){items=local.items||[];includeBuiltin();render();status('ใช้ draft ในเครื่อง · รอ Sync');return}status('กำลังโหลด...');showLoading(true);try{const r=await jsonp('getReportConfig',{account:account()});if(!r.ok)throw Error(r.message);items=r.items||[];includeBuiltin();render();status(`พร้อมใช้งาน ${items.length} รายการ config`)}catch(e){items=[];includeBuiltin();render();status(e.message,true)}finally{showLoading(false)}}
+  async function load(force=false){
+    const currentAccount=account(),local=drafts[currentAccount];
+    if(local&&!force){items=local.items||[];includeBuiltin();render();status('ใช้ draft ในเครื่อง · รอ Sync');return}
+    status('กำลังโหลด...');showLoading(true);
+    try{
+      const r=USE_WORKER ? await ADMIN_CLIENT.getReportConfig(currentAccount) : await jsonp('getReportConfig',{account:currentAccount});
+      if(!r.ok)throw Error(r.message||r.error);
+      CONFIG_VERSIONS[currentAccount]=String(r.version||'');
+      items=r.items||[];includeBuiltin();render();status(`พร้อมใช้งาน ${items.length} รายการ config · ${USE_WORKER?'Worker':'Legacy'}`);
+    }catch(e){items=[];includeBuiltin();render();status(e.message,true)}
+    finally{showLoading(false)}
+  }
   function render(){ $('listTitle').textContent=labelForKind();const list=$('list');list.innerHTML='';list.classList.toggle('reorderMode',reordering);const rows=visible();if(!rows.length){list.innerHTML='<p class="hint">ยังไม่มีรายการ กด “เพิ่ม” เพื่อสร้างรายการแรก</p>';return}rows.forEach((item,index)=>{const d=item.data||{},el=document.createElement('div');el.dataset.id=item.id;const skuMeta=kind==='sku'?` · ${escape(d.family||'SME')} · ${escape(d.category||'ยังไม่กำหนดหมวด')} · ${d.defaultFlag==='focus'?'⭐':d.defaultFlag==='skip'?'❌':'ว่าง'}`:'';const disabledMeta=item.active?'':' · ปิดใช้งาน';const orderLabel=kind==='sku'?'ลำดับ popup':'ลำดับ';const checked=item.active!==false?'checked':'';const toggleLabel=item.active!==false?'ปิดใช้งานรายการ':'เปิดใช้งานรายการ';el.className='item';el.innerHTML=reordering?`<div class="reorderRow"><button class="dragHandle" data-drag="${item.id}" aria-label="ลากเพื่อจัดเรียง ${escape(d.label||item.id)}">⠿</button><div class="reorderLabel">${escape(d.label||item.id)}</div></div>`:`<div class="itemHead"><div class="itemTitle">${escape(d.label||item.id)}</div><label class="activeToggle" title="${toggleLabel}"><input type="checkbox" data-active-toggle="${item.id}" ${checked} aria-label="${toggleLabel}"><span class="switchTrack"></span></label></div><div class="meta">${orderLabel} ${itemOrder(item)}${skuMeta}${disabledMeta}</div><div class="actions"><button class="soft" data-edit="${item.id}">แก้ไข</button><button class="soft" data-move="-1" data-id="${item.id}" ${index?'':'disabled'}>ขึ้น</button><button class="soft" data-move="1" data-id="${item.id}" ${index<rows.length-1?'':'disabled'}>ลง</button></div>`;list.appendChild(el)});}
   function escape(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function setToolsOpen(on){if(syncing)on=false;$('toolsMenu').classList.toggle('open',on);$('toolsMenu').setAttribute('aria-hidden',String(!on));$('toolsFab').setAttribute('aria-expanded',String(on))}
@@ -61,7 +83,57 @@
   async function save(item){item.account=account();const index=items.findIndex(x=>x.kind===item.kind&&x.id===item.id);if(index<0)items.push(item);else items[index]=item;persist()}
   function sameConfig(remote, local){const key=x=>`${x.kind}:${x.id}`;const left=[...remote].sort((a,b)=>key(a).localeCompare(key(b)));const right=[...local].sort((a,b)=>key(a).localeCompare(key(b)));return left.length===right.length&&left.every((item,index)=>key(item)===key(right[index])&&item.sort===right[index].sort&&(item.active!==false)===(right[index].active!==false)&&JSON.stringify(item.data||{})===JSON.stringify(right[index].data||{}))}
   function makeRequestId(){return `rc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`}
-  async function sync(){if(syncing)return;const currentAccount=account(),local=drafts[currentAccount];if(!local){status('ไม่มีรายการรอ Sync');return}local.items=(local.items||[]).map((item)=>({...item,account:currentAccount}));const requestId=makeRequestId(),payload=JSON.stringify({action:'saveReportConfigBulk',items:local.items,requestId});local.requestId=requestId;drafts[currentAccount]=local;localStorage.setItem(STORE,JSON.stringify(drafts));syncing=true;setFabSyncing(true);try{let lastError;for(let sendAttempt=1;sendAttempt<=3;sendAttempt++){status(sendAttempt===1?'กำลังส่งข้อมูล...':`กำลังส่งซ้ำ ${sendAttempt}/3...`);await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload});for(let checkAttempt=1;checkAttempt<=6;checkAttempt++){await new Promise(resolve=>setTimeout(resolve,1200));try{const meta=await jsonp('getReportConfigMeta',{account:currentAccount},25000);if(!meta.ok)throw Error(meta.message||'ตรวจสอบ API ไม่สำเร็จ');if(meta.lastRequestId!==requestId){status(`กำลังรอยืนยัน ${checkAttempt}/6...`);continue}status('ยืนยันข้อมูลแล้ว · กำลังโหลด...');const result=await jsonp('getReportConfig',{account:currentAccount},30000);if(!result.ok)throw Error(result.message||'โหลดข้อมูลหลัง Sync ไม่สำเร็จ');if(!sameConfig(result.items||[],local.items))throw Error('ข้อมูลบนเซิร์ฟเวอร์ไม่ตรงกับ draft');delete drafts[currentAccount];localStorage.setItem(STORE,JSON.stringify(drafts));items=result.items||[];includeBuiltin();render();status('Sync แล้ว');return}catch(error){lastError=error;status(`รอยืนยัน API อีกครั้ง ${checkAttempt}/6...`)}}}throw lastError||Error('ยังไม่ได้รับการยืนยันจาก API')}catch(e){console.error('Report admin sync failed',e);status(`Sync ไม่สำเร็จ · ${e.message||'เชื่อมต่อ API ไม่ได้'} · ข้อมูลยังอยู่ในเครื่อง`,true)}finally{syncing=false;setFabSyncing(false)}}
+  async function sync(){
+    if(syncing)return;
+    const currentAccount=account(),local=drafts[currentAccount];
+    if(!local){status('ไม่มีรายการรอ Sync');return}
+    local.items=(local.items||[]).map((item)=>({...item,account:currentAccount}));
+    const requestId=local.requestId||makeRequestId();
+    local.requestId=requestId;drafts[currentAccount]=local;localStorage.setItem(STORE,JSON.stringify(drafts));
+    syncing=true;setFabSyncing(true);
+    try{
+      if(USE_WORKER){
+        status('กำลังส่งข้อมูลผ่าน Worker...');
+        const result=await ADMIN_CLIENT.saveReportConfig(currentAccount,local.items,requestId,CONFIG_VERSIONS[currentAccount]||'');
+        CONFIG_VERSIONS[currentAccount]=String(result.version||'');
+        const confirmResult=await ADMIN_CLIENT.getReportConfig(currentAccount);
+        if(!sameConfig(confirmResult.items||[],local.items))throw Error('ข้อมูลบน Worker ไม่ตรงกับ draft');
+        CONFIG_VERSIONS[currentAccount]=String(confirmResult.version||CONFIG_VERSIONS[currentAccount]||'');
+        delete drafts[currentAccount];localStorage.setItem(STORE,JSON.stringify(drafts));
+        items=confirmResult.items||[];includeBuiltin();render();status('Sync แล้ว · Worker');
+        return;
+      }
+
+      const payload=JSON.stringify({action:'saveReportConfigBulk',items:local.items,requestId});
+      let lastError;
+      for(let sendAttempt=1;sendAttempt<=3;sendAttempt++){
+        status(sendAttempt===1?'กำลังส่งข้อมูล...':`กำลังส่งซ้ำ ${sendAttempt}/3...`);
+        await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload});
+        for(let checkAttempt=1;checkAttempt<=6;checkAttempt++){
+          await new Promise(resolve=>setTimeout(resolve,1200));
+          try{
+            const meta=await jsonp('getReportConfigMeta',{account:currentAccount},25000);
+            if(!meta.ok)throw Error(meta.message||'ตรวจสอบ API ไม่สำเร็จ');
+            if(meta.lastRequestId!==requestId){status(`กำลังรอยืนยัน ${checkAttempt}/6...`);continue}
+            status('ยืนยันข้อมูลแล้ว · กำลังโหลด...');
+            const result=await jsonp('getReportConfig',{account:currentAccount},30000);
+            if(!result.ok)throw Error(result.message||'โหลดข้อมูลหลัง Sync ไม่สำเร็จ');
+            if(!sameConfig(result.items||[],local.items))throw Error('ข้อมูลบนเซิร์ฟเวอร์ไม่ตรงกับ draft');
+            delete drafts[currentAccount];localStorage.setItem(STORE,JSON.stringify(drafts));
+            items=result.items||[];includeBuiltin();render();status('Sync แล้ว · Legacy');return;
+          }catch(error){lastError=error;status(`รอยืนยัน API อีกครั้ง ${checkAttempt}/6...`)}
+        }
+      }
+      throw lastError||Error('ยังไม่ได้รับการยืนยันจาก API');
+    }catch(e){
+      if(e && e.code==='VERSION_CONFLICT'){
+        status('มีการแก้ไข config จากที่อื่น · กดอัปเดทแล้วลองใหม่',true);
+      }else{
+        console.error('Report admin sync failed',e);
+        status(`Sync ไม่สำเร็จ · ${e.message||'เชื่อมต่อ API ไม่ได้'} · ข้อมูลยังอยู่ในเครื่อง`,true);
+      }
+    }finally{syncing=false;setFabSyncing(false)}
+  }
   async function importSeed(){if(!confirm(`นำเข้ารายการเดิมทั้งหมดสำหรับ ${account()}?`))return;const frame=document.createElement('iframe');frame.hidden=true;frame.src='Report.html?configSeed=1';document.body.appendChild(frame);await new Promise((resolve,reject)=>{frame.onload=resolve;setTimeout(()=>reject(Error('อ่านรายการเดิมไม่สำเร็จ')),30000)});const seed=frame.contentWindow.__PT_REPORT_CONFIG_SEED;frame.remove();if(!seed)throw Error('ไม่พบรายการเดิม');const layouts=seed.copyLayouts[account()]||[];const positions=new Map();layouts.forEach((g,gi)=>g.ids.forEach((id,si)=>positions.set(id,{category:g.heading,sort:(gi+1)*1000+si})));const applies=s=>account()==='CJ MORE'?(s.accounts||[]).includes('CJ MORE'):!(s.accounts||[]).length||(s.accounts||[]).includes(account());const rows=[];seed.skuItems.filter(applies).forEach((s,i)=>{const p=positions.get(s.id);rows.push({kind:'sku',id:s.id,sort:p?.sort??i+1,active:true,data:{label:s.label,family:s.family,category:p?.category??(s.family==='SME'?'📍SMOOTH E':'📍DENTISTE'),defaultFlag:seed.defaultFlags[s.id]||''}})});seed.summaryTopics.forEach((x,i)=>rows.push({kind:'summary',id:x.id,sort:i+1,active:true,data:{label:x.label}}));seed.promotionMediaItems.forEach((x,i)=>rows.push({kind:'promotion',id:x.id,sort:i+1,active:true,data:{label:x.label}}));for(let i=0;i<rows.length;i++){status(`กำลังนำเข้า ${i+1}/${rows.length}...`);await save(rows[i])}await load();status(`นำเข้ารายการเดิม ${rows.length} รายการแล้ว`)}
   document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{if(reordering)return;kind=b.dataset.kind;document.querySelectorAll('[data-kind]').forEach(x=>x.classList.toggle('active',x===b));render()});$('account').onchange=()=>{if(reordering)return;localStorage.setItem(ACCOUNT_STORE,account());load()};$('toolsFab').onclick=()=>setToolsOpen(!$('toolsMenu').classList.contains('open'));function closeToolsOnOutside(event){if(reordering||!$('toolsMenu').classList.contains('open'))return;if($('toolsMenu').contains(event.target)||$('toolsFab').contains(event.target))return;setToolsOpen(false)}document.addEventListener('pointerdown',closeToolsOnOutside);document.addEventListener('click',closeToolsOnOutside);$('toolAdd').onclick=()=>open(null);$('toolReorder').onclick=toggleReorder;$('toolCancel').onclick=cancelReorder;$('update').onclick=()=>drafts[account()]?status('มี draft รอ Sync กรุณา Sync ก่อน',true):load(true);$('sync').onclick=sync;$('toolSave').onclick=()=>{persist();setToolsOpen(false);sync()};$('close').onclick=close;$('modal').onclick=e=>{if(e.target===$('modal'))close()};$('list').addEventListener('pointerdown',startDrag);$('list').addEventListener('change',async e=>{const toggle=e.target.closest('[data-active-toggle]');if(!toggle||reordering)return;const item=items.find(row=>row.kind===kind&&row.id===toggle.dataset.activeToggle);if(!item)return;item.active=toggle.checked;await save(item);render()});document.addEventListener('pointermove',moveDrag,{passive:false});document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);$('list').onclick=async e=>{if(reordering)return;const edit=e.target.dataset.edit,id=e.target.dataset.id;if(edit)return open(items.find(x=>x.id===edit&&x.kind===kind));if(!id)return;const row=visible(),index=row.findIndex(x=>x.id===id),other=row[index+Number(e.target.dataset.move)];if(!other)return;const a=items.find(x=>x.kind===kind&&x.id===id),aOrder=itemOrder(a),otherOrder=itemOrder(other);if(kind==='sku'){a.data.formSort=otherOrder;other.data.formSort=aOrder}else{a.sort=otherOrder;other.sort= aOrder}await Promise.all([save(a),save(other)]);render()};$('form').onsubmit=async e=>{e.preventDefault();const item=editing||{account:account(),kind,id:makeId(),active:true};item.sort=item.sort??(Number($('sort').value)||0);item.data={label:$('label').value.trim(),family:$('family').value,category:$('category').value.trim(),formSort:kind==='sku'?(Number($('formSort').value)||item.sort):undefined,defaultFlag:$('defaultFlag').value};await save(item);close();render()};$('remove').onclick=()=>{if(!editing||!confirm('ลบรายการนี้?'))return;items=items.filter(x=>!(x.kind===editing.kind&&x.id===editing.id));persist();close();render()};load();
 $('toolsFab').addEventListener('click',event=>event.stopPropagation());

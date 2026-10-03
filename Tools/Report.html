@@ -700,12 +700,22 @@
     </div>
   </div>
 
+<script src="worker-auth.js"></script>
+<script src="backend-client.js"></script>
 <script>
 (() => {
   "use strict";
 
   const QUERY = new URLSearchParams(location.search);
-  const REPORT_CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbw91N5J4z1Jjn0rZz8qnn-ZFmP6bYJ2IZaKrOXrDaTj3aJoAvGJCVJBy982T_pXilNS/exec";
+  const REPORT_CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec";
+  const USE_WORKER_REPORT_CONFIG = QUERY.get("backend") !== "legacy" && !!(window.PTWorkerAuth && window.PTBackendClient);
+  const REPORT_CLIENT = USE_WORKER_REPORT_CONFIG ? window.PTBackendClient.create({
+    mode:"worker",
+    workerUrl:window.PTWorkerAuth.workerUrl,
+    getAuthorization:()=>window.PTWorkerAuth.getAuthorization("user"),
+    clearAuthorization:window.PTWorkerAuth.clearSession,
+    legacy:{}
+  }) : null;
   const EMBED = QUERY.get("embed") === "1";
   const HISTORY_MODE = QUERY.get("history") === "1" || location.hash === "#history";
 
@@ -717,6 +727,9 @@
   const STORE_UI = "PT_REPORT_UI_V1";
   const STORE_REPORT_CONFIG_CACHE = "PT_REPORT_CONFIG_CACHE_V1";
   const STORE_SKU_GLOBAL = "PT_REPORT_SKU_GLOBAL_V1";
+  // Shared with the map page. Write before postMessage so an immediate browser close
+  // cannot discard a completed report action.
+  const STORE_NOTED_OUTBOX = "PT_GBKK_NOTED_OUTBOX_V1";
   const SKU_GLOBAL_PRESET_VERSION = "2026-07-14-order-v2";
   const STORAGE_CACHE_PREFIX = "PT_GBKK_PLACES_CACHE_";
   const MAX_HISTORY_ITEMS = 240;
@@ -1209,14 +1222,12 @@
     if (Array.isArray(raw)){
       for (const id of raw){
         if (typeof id !== "string") continue;
-        if (!SKU_ITEM_MAP.has(id)) continue;
         out[id] = true;
       }
       return out;
     }
 
     for (const [id, value] of Object.entries(raw)){
-      if (!SKU_ITEM_MAP.has(id)) continue;
       out[id] = !!value;
     }
 
@@ -1594,11 +1605,21 @@
 
   async function getLatestReportConfig(accountName, verifiedVersion = null, cacheOnly = false){
     const cached = readReportConfigCache(accountName);
-    if (cached && (cacheOnly || (verifiedVersion !== null && Number(cached.version) === Number(verifiedVersion)))){
+    if (cached && (cacheOnly || (!USE_WORKER_REPORT_CONFIG && verifiedVersion !== null && Number(cached.version) === Number(verifiedVersion)))){
       return { result: cached.result, fromCache: true };
     }
     if (cacheOnly) throw new Error("ไม่พบ config ในเครื่อง");
     try{
+      if (USE_WORKER_REPORT_CONFIG){
+        const result = await REPORT_CLIENT.getReportConfig(accountName);
+        if (!result || !result.ok) throw new Error((result && result.message) || "โหลด config ไม่สำเร็จ");
+        if (cached && String(cached.version ?? "") === String(result.version ?? "")){
+          return { result: cached.result, fromCache: true };
+        }
+        writeReportConfigCache(accountName, result);
+        return { result, fromCache: false };
+      }
+
       const meta = await reportConfigMetaJsonp(accountName);
       if (!meta || !meta.ok) throw new Error((meta && meta.message) || "โหลดสถานะ config ไม่สำเร็จ");
       if (cached && Number(cached.version) === Number(meta.version)){
@@ -1981,8 +2002,34 @@
     };
   }
 
+  function queueEmbeddedNotedOutbox(){
+    if (!EMBED) return;
+    const placeId = String((embedPrefillContext && embedPrefillContext.placeId) || "").trim();
+    const sheetName = String((embedPrefillContext && embedPrefillContext.sheetName) || "").trim();
+    if (!placeId || !sheetName) return;
+
+    let noted = "";
+    try{
+      noted = JSON.stringify({
+        v: 4,
+        ...buildNotedPayloadForParent(),
+        reportDateISO: reportDate.value || todayISO(),
+        updatedAt: new Date().toISOString()
+      });
+      const raw = JSON.parse(localStorage.getItem(STORE_NOTED_OUTBOX) || "[]");
+      const items = Array.isArray(raw) ? raw : [];
+      const key = `${sheetName}|${placeId}`;
+      const next = items.filter((item) => `${String(item && item.sheetName || "").trim()}|${String(item && item.id || "").trim()}` !== key);
+      next.push({ id: placeId, sheetName, noted, createdAt: Date.now() });
+      localStorage.setItem(STORE_NOTED_OUTBOX, JSON.stringify(next));
+    }catch(_){
+      // The parent still receives the payload and can keep the current-session state.
+    }
+  }
+
   function notifyParentReportCopied(){
     if (!EMBED) return;
+    queueEmbeddedNotedOutbox();
     postToParent("PT_REPORT_COPIED", {
       placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
       reportToken: String((embedPrefillContext && embedPrefillContext.reportToken) || "").trim(),
@@ -1999,6 +2046,7 @@
 
   function notifyParentReportSaved(){
     if (!EMBED) return;
+    queueEmbeddedNotedOutbox();
     postToParent("PT_REPORT_SAVED", {
       placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
       reportToken: String((embedPrefillContext && embedPrefillContext.reportToken) || "").trim(),
