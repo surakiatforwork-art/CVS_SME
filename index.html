@@ -3094,8 +3094,9 @@
     try{
       var place = routeEditPlace;
       var sheetAtCall = String(CURRENT_SHEET || '');
+      var routeRequestId = outboxRequestId_('route');
       var res = await enqueueSheetWrite_(function(){
-        return apiUpdateRoute(place.id, route, sheetAtCall);
+        return apiUpdateRoute(place.id, route, sheetAtCall, routeRequestId);
       });
       if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'บันทึก Route ไม่สำเร็จ');
 
@@ -3204,8 +3205,9 @@
     try{
       var place = locationEditPlace;
       var sheetAtCall = String(CURRENT_SHEET || '');
+      var locationRequestId = outboxRequestId_('location');
       var res = await enqueueSheetWrite_(function(){
-        return apiUpdateLocation(place.id, point.lat, point.lng, sheetAtCall);
+        return apiUpdateLocation(place.id, point.lat, point.lng, sheetAtCall, locationRequestId);
       });
       if(!res || !res.ok) throw new Error(res && res.message ? res.message : 'บันทึก Location ไม่สำเร็จ');
 
