@@ -103,7 +103,7 @@ async function call(path, init = {}, env = { ...baseEnv, DB: fakeDB }) {
   assert.equal(resetRes.status, 200);
   const resetBody = await resetRes.json();
   assert.equal(resetBody.preservedLastVisitedDate, true);
-  assert.ok(batchedSql.some(sql => sql.includes("SET visited=0") && sql.includes("visit_version=CASE")));
+  assert.ok(batchedSql.some(sql => sql.includes("SET visited=0") && sql.includes("json_each(?)")));
   assert.ok(!batchedSql.some(sql => sql.includes("last_visited_date=''")),
     "reset must preserve last_visited_date");
 

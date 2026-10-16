@@ -605,15 +605,22 @@ async function resetVisits(env, teamId, requestId, ctx) {
     ).bind(requestId, requestHash, operationVersion, JSON.stringify(response), now, now),
   ];
   if (targets.length) {
-    const caseSql = targets.map(() => "WHEN ? THEN ?").join(" ");
-    const caseArgs = [];
-    for (const target of targets) caseArgs.push(target.storeId, target.visitVersion);
+    const versionsJson = JSON.stringify(targets);
     statements.push(env.DB.prepare(
-      `UPDATE stores SET visited=0,
-         visit_version=CASE store_id ${caseSql} ELSE visit_version END,
-         updated_at=?
-       WHERE team_id=? AND source_active=1`
-    ).bind(...caseArgs, now, teamId));
+      `WITH versions AS (
+         SELECT json_extract(value,'$.storeId') AS store_id,
+                json_extract(value,'$.visitVersion') AS visit_version
+           FROM json_each(?)
+       )
+       UPDATE stores
+          SET visited=0,
+              visit_version=COALESCE(
+                (SELECT v.visit_version FROM versions v WHERE v.store_id=stores.store_id),
+                visit_version
+              ),
+              updated_at=?
+        WHERE team_id=? AND source_active=1`
+    ).bind(versionsJson, now, teamId));
   }
   statements.push(
     env.DB.prepare(
