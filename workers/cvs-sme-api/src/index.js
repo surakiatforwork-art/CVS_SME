@@ -580,30 +580,54 @@ async function resetVisits(env, teamId, requestId, ctx) {
   const team = await env.DB.prepare("SELECT team_id FROM teams WHERE team_id=? AND active=1").bind(teamId).first();
   if (!team) throw new HttpError(404, "TEAM_NOT_FOUND");
 
-  const visitVersion = await hashVersion("0|");
+  const { results = [] } = await env.DB.prepare(
+    "SELECT store_id,last_visited_date FROM stores WHERE team_id=? AND source_active=1 ORDER BY CAST(store_id AS INTEGER),store_id"
+  ).bind(teamId).all();
+  const targets = [];
+  for (const row of results) {
+    const lastVisitedDate = String(row.last_visited_date || "");
+    targets.push({
+      storeId: String(row.store_id),
+      visitVersion: await hashVersion("0|" + lastVisitedDate),
+    });
+  }
+  const operationVersion = await hashVersion(JSON.stringify(targets.map(x => [x.storeId,x.visitVersion])));
   const now = new Date().toISOString();
-  const response = { ok: true, teamId, reset: true, visitVersion };
+  const response = {
+    ok: true, teamId, reset: true, resetCount: targets.length,
+    visitVersion: operationVersion, preservedLastVisitedDate: true,
+  };
   const statements = [
     env.DB.prepare(
       `INSERT INTO api_idempotency
        (request_id,request_hash,status,operation_version,response_json,created_at,updated_at)
        VALUES(?,?,'pending',?,?,?,?)`
-    ).bind(requestId, requestHash, visitVersion, JSON.stringify(response), now, now),
-    env.DB.prepare(
-      "UPDATE stores SET visited=0,last_visited_date='',visit_version=?,updated_at=? WHERE team_id=? AND source_active=1"
-    ).bind(visitVersion, now, teamId),
+    ).bind(requestId, requestHash, operationVersion, JSON.stringify(response), now, now),
+  ];
+  if (targets.length) {
+    const caseSql = targets.map(() => "WHEN ? THEN ?").join(" ");
+    const caseArgs = [];
+    for (const target of targets) caseArgs.push(target.storeId, target.visitVersion);
+    statements.push(env.DB.prepare(
+      `UPDATE stores SET visited=0,
+         visit_version=CASE store_id ${caseSql} ELSE visit_version END,
+         updated_at=?
+       WHERE team_id=? AND source_active=1`
+    ).bind(...caseArgs, now, teamId));
+  }
+  statements.push(
     env.DB.prepare(
       `INSERT INTO sync_outbox
        (action,team_id,request_id,payload_json,status,attempt_count,next_attempt_at,created_at,updated_at)
        VALUES('resetVisitedAll',?,?,?,'pending',0,?,?,?)`
-    ).bind(teamId, "projection:" + requestId, JSON.stringify({sheet:teamId,targetVersion:visitVersion}), now, now, now),
+    ).bind(teamId, "projection:" + requestId, JSON.stringify({sheet:teamId,preserveLastVisitedDate:true}), now, now, now),
     env.DB.prepare(
       `INSERT INTO audit_events(event_type,origin,team_id,request_id,payload_json,created_at)
        VALUES('reset_visits','worker_api',?,?,?,?)`
-    ).bind(teamId, requestId, JSON.stringify({visitVersion}), now),
+    ).bind(teamId, requestId, JSON.stringify({operationVersion,resetCount:targets.length,preservedLastVisitedDate:true}), now),
     env.DB.prepare("UPDATE api_idempotency SET status='done',updated_at=? WHERE request_id=?")
       .bind(now, requestId),
-  ];
+  );
   try {
     await env.DB.batch(statements);
   } catch (err) {
@@ -614,7 +638,6 @@ async function resetVisits(env, teamId, requestId, ctx) {
   ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
-
 async function saveReportConfig(env, accountRaw, body, requestId, ctx) {
   const account = String(accountRaw || "").trim();
   if (!Array.isArray(body.items) || !body.items.length) {
@@ -1057,14 +1080,16 @@ async function legacyFetchJson_(env, query, init = {}) {
 
 async function updateSheetShadow(env, job, params) {
   const field = outboxField_(job.action);
+  if (field === "visit" && job.action === "resetVisitedAll") {
+    await env.DB.prepare("UPDATE stores SET sheet_visit_version=visit_version WHERE team_id=? AND source_active=1")
+      .bind(job.team_id).run();
+    return;
+  }
   const target = String(params.targetVersion || "");
   if (!target) return;
   if (field === "reportConfig") {
     await env.DB.prepare("UPDATE report_config_sets SET sheet_version=? WHERE account=? AND version=?")
       .bind(target, job.account, target).run();
-  } else if (field === "visit" && job.action === "resetVisitedAll") {
-    await env.DB.prepare("UPDATE stores SET sheet_visit_version=? WHERE team_id=? AND visit_version=?")
-      .bind(target, job.team_id, target).run();
   } else if (field && job.team_id && job.store_id) {
     const col = {noted:"sheet_noted_version",route:"sheet_route_version",location:"sheet_location_version",visit:"sheet_visit_version"}[field];
     const versionCol = {noted:"noted_version",route:"route_version",location:"location_version",visit:"visit_version"}[field];

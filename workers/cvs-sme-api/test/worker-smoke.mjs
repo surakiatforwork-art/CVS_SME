@@ -12,7 +12,7 @@ class FakeStatement {
       return { results: [{
         store_id: "1", name: "Store 1", lat: 13.9, lng: 100.4,
         maps_url: "", account: "LAWSON", number: "P1", account_name: "Test",
-        noted: "ทดสอบ", route: "1", visited: 0, last_visited_date: "",
+        noted: "ทดสอบ", route: "1", visited: 1, last_visited_date: "2026-10-15",
         noted_version: "nv", route_version: "rv", location_version: "lv",
         visit_version: "vv", updated_at: "2026-10-01T00:00:00.000Z",
       }] };
@@ -30,9 +30,13 @@ class FakeStatement {
   }
   async run() { return { meta: { changes: 1 } }; }
 }
+let batchedSql = [];
 const fakeDB = {
   prepare(sql) { return new FakeStatement(sql); },
-  async batch() { return []; },
+  async batch(statements) {
+    batchedSql = statements.map(statement => statement.sql);
+    return statements.map(() => ({ meta:{ changes:1 } }));
+  },
 };
 
 const baseEnv = {
@@ -97,6 +101,11 @@ async function call(path, init = {}, env = { ...baseEnv, DB: fakeDB }) {
     body: "{}",
   }, sessionEnv);
   assert.equal(resetRes.status, 200);
+  const resetBody = await resetRes.json();
+  assert.equal(resetBody.preservedLastVisitedDate, true);
+  assert.ok(batchedSql.some(sql => sql.includes("SET visited=0") && sql.includes("visit_version=CASE")));
+  assert.ok(!batchedSql.some(sql => sql.includes("last_visited_date=''")),
+    "reset must preserve last_visited_date");
 
   const legacyUserLogin = await call("/auth/login", {
     method: "POST",
