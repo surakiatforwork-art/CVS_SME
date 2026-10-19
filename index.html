@@ -4866,17 +4866,22 @@
   function handleReportCopiedMessage_(payload){
     payload = payload || {};
     ensureHistoryExistsFromPayload_(payload);
-    handleReportSavedMessage_(payload);
+    return handleReportSavedMessage_(payload);
   }
+
+  window.PTCommitReportCopy = handleReportCopiedMessage_;
 
   function handleReportSavedMessage_(payload){
     var ctx = resolveSafeReportCopyContext_(payload);
-    if(!persistReportNotedFromPayload_(payload)) return;
-    if(!SETTINGS.saveAndVisit || !ctx || ctx.sheetName !== String(CURRENT_SHEET || '')) return;
+    if(!persistReportNotedFromPayload_(payload)) return false;
+    if(!SETTINGS.saveAndVisit) return true;
+    if(!ctx || ctx.sheetName !== String(CURRENT_SHEET || '')) return false;
     var place = PLACES.find(function(item){ return String(item.id) === ctx.placeId; });
-    if(!place || place.visited || PENDING.has(ctx.placeId)) return;
+    if(!place) return false;
+    if(place.visited) return true;
+    if(PENDING.has(ctx.placeId)) return false;
     var snap = applyOptimisticVisited_(ctx.placeId);
-    if(snap) commitVisited_(ctx.placeId, snap.sheet);
+    return snap ? commitVisited_(ctx.placeId, snap.sheet) : false;
   }
 
   function renderFromCacheIfAny_(sheetName){
@@ -5029,12 +5034,13 @@
     if(!queueVisitForSync_(id, sh)){
       rollbackOptimisticVisited_(id);
       showToast('บันทึกลงเครื่องไม่สำเร็จ (คืนค่าแล้ว)');
-      return;
+      return false;
     }
     PENDING.delete(id);
     persistCurrentPlacesCache_(sh);
     showToast('บันทึกในเครื่องแล้ว ✓');
     syncVisitOutbox_(false);
+    return true;
   }
 
   async function verifyVisitedCommit_(placeId, sheetName){

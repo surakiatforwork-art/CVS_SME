@@ -2154,7 +2154,7 @@
   function notifyParentReportCopied(){
     if (!EMBED) return;
     queueEmbeddedNotedOutbox();
-    postToParent("PT_REPORT_COPIED", {
+    const payload = {
       placeId: String((embedPrefillContext && embedPrefillContext.placeId) || "").trim(),
       reportToken: String((embedPrefillContext && embedPrefillContext.reportToken) || "").trim(),
       sheetName: String((embedPrefillContext && embedPrefillContext.sheetName) || "").trim(),
@@ -2165,7 +2165,15 @@
       branchCode: safeText(branchCode.value).trim(),
       branchName: safeText(branchName.value).trim(),
       noted: buildNotedPayloadForParent()
-    });
+    };
+    // Complete durable parent writes before an external app can suspend this page.
+    try{
+      if (typeof window.parent.PTCommitReportCopy === "function"){
+        return window.parent.PTCommitReportCopy(payload) === true;
+      }
+    }catch(_){}
+    postToParent("PT_REPORT_COPIED", payload);
+    return false;
   }
 
   function notifyParentReportSaved(){
@@ -2651,9 +2659,13 @@
     showToast("คัดลอกแล้ว ✅");
     addHistoryEntry(text);
     saveFormState();
-    notifyParentReportCopied();
+    const committed = notifyParentReportCopied();
 
     if (openLine){
+      if (EMBED && committed !== true){
+        setStatus("err", "คัดลอกแล้ว แต่ยังยืนยันการบันทึกไม่ได้ กรุณาลองอีกครั้งก่อนเปิด LINE");
+        return;
+      }
       const url = getLineUrlByAccount(account.value);
       openUrl(url);
       showToast("เปิด LINE กลุ่มแล้ว");
