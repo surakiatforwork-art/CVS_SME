@@ -3464,7 +3464,7 @@
   }
 
   function reportNotedDefaults_(){
-    return { locationArea:'', issue:'', note:'', skuChecks:{}, summarySelections:{}, promotionMediaSelections:{} };
+    return { locationArea:'', issue:'', note:'', skuChecks:{}, orderQuantities:{}, summarySelections:{}, promotionMediaSelections:{} };
   }
 
   function normalizeSkuChecksMap_(raw){
@@ -3485,6 +3485,17 @@
       out[key] = !!raw[key];
     }
 
+    return out;
+  }
+
+  function normalizeOrderQuantitiesMap_(raw){
+    var out = {};
+    if(!raw || typeof raw !== 'object') return out;
+    Object.keys(raw).forEach(function(id){
+      var quantity = Number(raw[id]);
+      // The report control only permits order packs of three, up to twelve.
+      if([3,6,9,12].indexOf(quantity) !== -1) out[String(id)] = quantity;
+    });
     return out;
   }
 
@@ -3573,6 +3584,7 @@
     if(obj.issue !== undefined && obj.issue !== null) out.issue = String(obj.issue);
     if(obj.note !== undefined && obj.note !== null) out.note = String(obj.note);
     out.skuChecks = normalizeSkuChecksMap_(obj.skuChecks || obj.checkedSkus || {});
+    out.orderQuantities = normalizeOrderQuantitiesMap_(obj.orderQuantities || obj.orderQtys || {});
     out.summarySelections = normalizeSummarySelectionsMap_(obj.summarySelections || obj.summaryChecks || obj.summaryTopics || {});
     out.promotionMediaSelections = normalizePromotionMediaSelectionsMap_(obj.promotionMediaSelections || obj.promotionMedia || {});
 
@@ -3607,6 +3619,7 @@
       locationArea: String(noted.locationArea || ''),
       issue: String(noted.issue || ''),
       skuChecks: normalizeSkuChecksMap_(noted.skuChecks || {}),
+      orderQuantities: normalizeOrderQuantitiesMap_(noted.orderQuantities || {}),
       summarySelections: normalizeSummarySelectionsMap_(noted.summarySelections || {}),
       promotionMediaSelections: normalizePromotionMediaSelectionsMap_(noted.promotionMediaSelections || {})
     };
@@ -3622,6 +3635,7 @@
       locationArea: notedPayload.locationArea,
       issue: notedPayload.issue,
       skuChecks: notedPayload.skuChecks,
+      orderQuantities: notedPayload.orderQuantities,
       summarySelections: notedPayload.summarySelections,
       promotionMediaSelections: notedPayload.promotionMediaSelections,
       noted: notedPayload
@@ -4732,6 +4746,7 @@
     if(src && src.issue !== undefined && src.issue !== null) out.issue = String(src.issue);
     if(src && src.note !== undefined && src.note !== null) out.note = String(src.note);
     out.skuChecks = normalizeSkuChecksMap_(src ? (src.skuChecks || src.checkedSkus || {}) : {});
+    out.orderQuantities = normalizeOrderQuantitiesMap_(src ? (src.orderQuantities || src.orderQtys || {}) : {});
     out.summarySelections = normalizeSummarySelectionsMap_(src ? (src.summarySelections || src.summaryChecks || src.summaryTopics || {}) : {});
     out.promotionMediaSelections = normalizePromotionMediaSelectionsMap_(src ? (src.promotionMediaSelections || src.promotionMedia || {}) : {});
 
@@ -4741,6 +4756,7 @@
       issue: out.issue,
       note: out.note,
       skuChecks: out.skuChecks,
+      orderQuantities: out.orderQuantities,
       summarySelections: out.summarySelections,
       promotionMediaSelections: out.promotionMediaSelections
     };

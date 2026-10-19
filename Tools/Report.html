@@ -314,7 +314,7 @@
     }
     .skuRow{
       display:grid;
-      grid-template-columns:92px minmax(0, 1fr) auto;
+      grid-template-columns:92px minmax(0, 1fr) auto auto;
       gap:10px;
       align-items:center;
       padding:10px;
@@ -362,6 +362,42 @@
       height:20px;
       accent-color:var(--accent);
       margin:0;
+    }
+    .skuOrderStep{
+      display:inline-flex;
+      align-items:center;
+      gap:2px;
+      min-width:96px;
+      padding:3px;
+      border:1px solid rgba(16,185,129,.20);
+      border-radius:999px;
+      background:rgba(16,185,129,.06);
+    }
+    .skuOrderStep[hidden]{ display:none; }
+    .skuOrderButton{
+      width:26px;
+      height:26px;
+      border:0;
+      border-radius:999px;
+      background:transparent;
+      color:#047857;
+      font:900 18px/1 inherit;
+      cursor:pointer;
+    }
+    .skuOrderButton:disabled{ color:#94a3b8; cursor:not-allowed; }
+    .skuOrderValue{
+      min-width:28px;
+      color:#0f766e;
+      font-size:13px;
+      font-weight:950;
+      text-align:center;
+    }
+    @media (max-width:520px){
+      .skuRow{ grid-template-columns:80px minmax(0, 1fr) auto auto; gap:7px; padding:8px; }
+      .skuCheckWrap{ padding:7px 10px; }
+      .skuOrderStep{ min-width:84px; }
+      .skuOrderButton{ width:23px; height:23px; }
+      .skuOrderValue{ min-width:24px; }
     }
     .skuRow.sku-disabled{
       background:rgba(239,68,68,.05);
@@ -1200,6 +1236,7 @@
       issue: DEFAULT_ISSUE_TEMPLATE,
       note: DEFAULT_NOTE_TEMPLATE,
       skuChecks: {},
+      orderQuantities: {},
       summarySelections: {},
       promotionMediaSelections: {}
     };
@@ -1231,6 +1268,16 @@
       out[id] = !!value;
     }
 
+    return out;
+  }
+
+  function normalizeOrderQuantities(raw){
+    const out = {};
+    if (!raw || typeof raw !== "object") return out;
+    for (const [id, value] of Object.entries(raw)){
+      const quantity = Number(value);
+      if ([3, 6, 9, 12].includes(quantity)) out[id] = quantity;
+    }
     return out;
   }
 
@@ -1299,6 +1346,7 @@
       out.note = text.trim() ? stripPromotionMediaSection(text) : "";
     }
     out.skuChecks = normalizeSkuChecks(source.skuChecks || source.checkedSkus || {});
+    out.orderQuantities = normalizeOrderQuantities(source.orderQuantities || source.orderQtys || {});
     out.summarySelections = normalizeSummarySelections(
       source.summarySelections || source.summaryChecks || source.summaryTopics || {}
     );
@@ -1683,10 +1731,11 @@
   async function loadOnlineReportConfig(accountName = account.value, forceRefresh = false, preservedState = null, verifiedVersion = null, cacheOnly = false){
     const normalized = safeText(accountName).trim();
     const savedSkuChecks = preservedState ? (preservedState.skuChecks || {}) : collectSkuChecksFromDom();
+    const savedOrderQuantities = preservedState ? (preservedState.orderQuantities || {}) : collectOrderQuantitiesFromDom();
     const savedSummaries = preservedState ? (preservedState.summarySelections || {}) : collectSummarySelectionsFromDom();
     const savedPromotions = preservedState ? (preservedState.promotionMediaSelections || {}) : collectPromotionMediaSelectionsFromDom();
     if (!normalized){
-      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      applySkuChecksToDom(savedSkuChecks); applyOrderQuantitiesToDom(savedOrderQuantities); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
       updatePreview();
       return null;
     }
@@ -1699,7 +1748,7 @@
       applyRemoteReportConfig(normalized, result.items);
       renderSummaryTopics(); renderPromotionMedia(); renderSkuLists();
       loadGlobalSkuFlags(); applyGlobalFlagsToDom();
-      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      applySkuChecksToDom(savedSkuChecks); applyOrderQuantitiesToDom(savedOrderQuantities); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
       updatePreview();
       setStatus(offline ? "wait" : "ok", fromCache ? "Config ล่าสุดพร้อม" : "Config ออนไลน์พร้อม");
     }).catch(() => {
@@ -1707,7 +1756,7 @@
       restoreBuiltinReportConfig();
       renderSummaryTopics(); renderPromotionMedia(); renderSkuLists();
       loadGlobalSkuFlags(); applyGlobalFlagsToDom();
-      applySkuChecksToDom(savedSkuChecks); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
+      applySkuChecksToDom(savedSkuChecks); applyOrderQuantitiesToDom(savedOrderQuantities); applySummarySelectionsToDom(savedSummaries); applyPromotionMediaSelectionsToDom(savedPromotions);
       updatePreview();
       setStatus("wait", "ใช้ config ในเครื่อง");
     }).finally(() => {
@@ -1735,6 +1784,11 @@
       <label class="skuCheckWrap">
         <input type="checkbox" class="skuCheck" data-role="check" aria-label="มีสินค้า ${escapeHtmlAttr(item.label)}">
       </label>
+      <div class="skuOrderStep" data-role="order-step" hidden aria-label="จำนวนสั่งเพิ่ม ${escapeHtmlAttr(item.label)}">
+        <button type="button" class="skuOrderButton" data-role="order-minus" aria-label="ลดจำนวนสั่ง ${escapeHtmlAttr(item.label)}">−</button>
+        <output class="skuOrderValue" data-role="order-value">0</output>
+        <button type="button" class="skuOrderButton" data-role="order-plus" aria-label="เพิ่มจำนวนสั่ง ${escapeHtmlAttr(item.label)}">+</button>
+      </div>
     `;
     return row;
   }
@@ -1761,9 +1815,13 @@
   }
 
   function updateSkuVisibility(){
+    const supportsOrders = safeText(account.value).trim().toUpperCase() === "7-ELEVEN";
     for (const item of SKU_ITEMS){
       const row = getSkuRow(item.id);
-      if (row) row.hidden = !isSkuAvailableForAccount(item);
+      if (!row) continue;
+      row.hidden = !isSkuAvailableForAccount(item);
+      const orderStep = row.querySelector('[data-role="order-step"]');
+      if (orderStep) orderStep.hidden = !supportsOrders;
     }
   }
 
@@ -1790,6 +1848,11 @@
     }
 
     row.classList.toggle("sku-disabled", isSkip);
+    const orderStep = row.querySelector('[data-role="order-step"]');
+    if (orderStep){
+      for (const button of orderStep.querySelectorAll("button")) button.disabled = isSkip;
+      if (isSkip) setOrderQuantityForRow(row, 0);
+    }
   }
 
   function applyGlobalFlagsToDom(){
@@ -1799,6 +1862,43 @@
       select.value = normalizeMonthlyFlag(globalSkuFlags[id]);
       syncSkuRowState(row, false);
     }
+  }
+
+  function setOrderQuantityForRow(row, value){
+    if (!row) return;
+    const quantity = [3, 6, 9, 12].includes(Number(value)) ? Number(value) : 0;
+    row.dataset.orderQuantity = String(quantity);
+    const output = row.querySelector('[data-role="order-value"]');
+    if (output) output.textContent = String(quantity);
+    const minus = row.querySelector('[data-role="order-minus"]');
+    const plus = row.querySelector('[data-role="order-plus"]');
+    if (minus) minus.disabled = quantity <= 0 || getRowFlag(row) === MONTHLY_FLAG_SKIP;
+    if (plus) plus.disabled = quantity >= 12 || getRowFlag(row) === MONTHLY_FLAG_SKIP;
+  }
+
+  function clearOrderQuantities(){
+    for (const row of getSkuRows()) setOrderQuantityForRow(row, 0);
+  }
+
+  function applyOrderQuantitiesToDom(raw){
+    clearOrderQuantities();
+    const quantities = normalizeOrderQuantities(raw);
+    for (const [id, quantity] of Object.entries(quantities)){
+      const row = getSkuRow(id);
+      if (!row || getRowFlag(row) === MONTHLY_FLAG_SKIP) continue;
+      setOrderQuantityForRow(row, quantity);
+    }
+  }
+
+  function collectOrderQuantitiesFromDom(){
+    if (safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return {};
+    const out = {};
+    for (const row of getSkuRows()){
+      if (row.hidden || getRowFlag(row) === MONTHLY_FLAG_SKIP) continue;
+      const quantity = Number(row.dataset.orderQuantity || 0);
+      if ([3, 6, 9, 12].includes(quantity)) out[row.dataset.skuId] = quantity;
+    }
+    return out;
   }
 
   function loadGlobalSkuFlags(){
@@ -1917,6 +2017,16 @@
     return `${prefix}${item.label} : ${value}`;
   }
 
+  function buildOrderQuantityLines(){
+    const quantities = collectOrderQuantitiesFromDom();
+    const activeById = new Map(getActiveSkuItems().map((item) => [item.id, item]));
+    return Object.entries(quantities)
+      .map(([id, quantity]) => ({ item: activeById.get(id), quantity }))
+      .filter(({ item }) => !!item)
+      .sort((a, b) => Number(a.item.sort) - Number(b.item.sort))
+      .map(({ item, quantity }) => `${item.label} : ${quantity}`);
+  }
+
   function getReportCopySections(){
     const accountKey = safeText(account.value).trim().toUpperCase();
     const layout = REPORT_COPY_LAYOUTS[accountKey];
@@ -1997,6 +2107,7 @@
       issue: safeText(issueValueOrDefault(issue.value)).trimEnd(),
       note: safeText(note.value).trimEnd(),
       skuChecks: collectSkuChecksFromDom(),
+      orderQuantities: collectOrderQuantitiesFromDom(),
       summarySelections: collectSummarySelectionsFromDom(),
       promotionMediaSelections: collectPromotionMediaSelectionsFromDom()
     };
@@ -2096,7 +2207,12 @@
       for (const item of getActiveSkuItems()) lines.push(buildSkuLine(item));
     }
 
-    lines.push("");
+    if (safeText(account.value).trim().toUpperCase() === "7-ELEVEN"){
+      lines.push("");
+      lines.push("🗒️รายการสินค้าที่สั่งเพิ่ม");
+      lines.push(...buildOrderQuantityLines());
+      lines.push("");
+    }
     lines.push("⛔ปัญหาที่พบ");
     lines.push(issueText);
     lines.push("");
@@ -2215,6 +2331,7 @@
       data.issue = issueValueOrDefault(issue.value);
       data.note = noteValueOrDefault(note.value);
       data.skuChecks = collectSkuChecksFromDom();
+      data.orderQuantities = collectOrderQuantitiesFromDom();
       data.summarySelections = collectSummarySelectionsFromDom();
       data.promotionMediaSelections = collectPromotionMediaSelectionsFromDom();
     } else {
@@ -2225,6 +2342,7 @@
       delete data.issue;
       delete data.note;
       delete data.skuChecks;
+      delete data.orderQuantities;
       delete data.summarySelections;
       delete data.promotionMediaSelections;
     }
@@ -2254,6 +2372,7 @@
       issue.value = issueValueOrDefault(data.issue);
       note.value = noteValueOrDefault(data.note);
       applySkuChecksToDom(data.skuChecks || {});
+      applyOrderQuantitiesToDom(data.orderQuantities || {});
       applySummarySelectionsToDom(data.summarySelections || {});
       applyPromotionMediaSelectionsToDom(data.promotionMediaSelections || {});
     } else {
@@ -2264,6 +2383,7 @@
       issue.value = DEFAULT_ISSUE_TEMPLATE;
       note.value = DEFAULT_NOTE_TEMPLATE;
       applySkuChecksToDom({});
+      applyOrderQuantitiesToDom({});
       applySummarySelectionsToDom({});
       applyPromotionMediaSelectionsToDom({});
     }
@@ -2634,6 +2754,18 @@
     updatePreview();
   }
 
+  function changeOrderQuantity(target){
+    const row = target.closest(".skuRow");
+    if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
+    if (getRowFlag(row) === MONTHLY_FLAG_SKIP) return;
+    const direction = target.matches('[data-role="order-plus"]') ? 1 : -1;
+    const current = Number(row.dataset.orderQuantity || 0);
+    const next = Math.max(0, Math.min(12, current + (direction * 3)));
+    setOrderQuantityForRow(row, next);
+    saveFormState();
+    updatePreview();
+  }
+
   reportDate.addEventListener("change", () => {
     syncReportDateModeFromInput();
     saveFormState();
@@ -2659,6 +2791,12 @@
     if (!(target instanceof HTMLElement)) return;
     if (!target.matches('[data-role="flag"], [data-role="check"]')) return;
     handleSkuControlChange(target);
+  });
+  skuBoard.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches('[data-role="order-minus"], [data-role="order-plus"]')) return;
+    changeOrderQuantity(target);
   });
 
   btnCopy.addEventListener("click", () => doCopy({ openLine: true }));
@@ -2717,6 +2855,7 @@
         issue.value = DEFAULT_ISSUE_TEMPLATE;
         note.value = DEFAULT_NOTE_TEMPLATE;
         clearAllSkuChecks();
+        clearOrderQuantities();
         applySummarySelectionsToDom({});
         applyPromotionMediaSelectionsToDom({});
         saveFormState();
@@ -2746,6 +2885,7 @@
     updatePreview();
     await loadOnlineReportConfig(account.value, !!payload.forceConfigRefresh, {
       skuChecks: noted.skuChecks || {},
+      orderQuantities: noted.orderQuantities || {},
       summarySelections: noted.summarySelections || {},
       promotionMediaSelections: noted.promotionMediaSelections || {}
     }, payload.reportConfigVersion ?? null, !!payload.cacheOnly);
