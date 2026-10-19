@@ -393,11 +393,24 @@
       text-align:center;
     }
     @media (max-width:520px){
-      .skuRow{ grid-template-columns:80px minmax(0, 1fr) auto auto; gap:7px; padding:8px; }
-      .skuCheckWrap{ padding:7px 10px; }
-      .skuOrderStep{ min-width:84px; }
-      .skuOrderButton{ width:23px; height:23px; }
-      .skuOrderValue{ min-width:24px; }
+      .skuList{ padding:6px; }
+      .skuRow{ grid-template-columns:44px minmax(0, 1fr) auto auto; gap:4px; padding:8px 6px; }
+      .skuFlag{
+        width:44px;
+        padding:10px 15px 10px 3px;
+        border-radius:10px;
+        font-size:14px;
+        appearance:none;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='m1 1 3 3 3-3' fill='none' stroke='%2364758b' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-repeat:no-repeat;
+        background-position:right 4px center;
+      }
+      .skuTitle{ font-size:13px; line-height:1.4; }
+      .skuCheckWrap{ min-height:40px; padding:0 5px; }
+      .skuCheckWrap input{ width:19px; height:19px; }
+      .skuOrderStep{ min-width:0; gap:0; padding:0; }
+      .skuOrderButton{ width:24px; height:40px; padding:0; font-size:17px; }
+      .skuOrderValue{ min-width:18px; font-size:12px; }
     }
     .skuRow.sku-disabled{
       background:rgba(239,68,68,.05);
