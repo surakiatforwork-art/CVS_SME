@@ -1736,7 +1736,7 @@
       <div class="set-card">
         <div class="set-h">
           <strong>SAVE + ไปแล้ว</strong>
-          <small>เมื่อกด SAVE ใน Report ให้บันทึกรายงานและทำเครื่องหมายร้านว่าไปแล้วด้วย</small>
+          <small>เมื่อกด SAVE, COPY หรือ COPY to LINE ใน Report ให้บันทึกรายงานและทำเครื่องหมายร้านว่าไปแล้วด้วย</small>
         </div>
         <label class="set-check set-switch">
           SAVE + ไปแล้ว
@@ -4866,7 +4866,7 @@
   function handleReportCopiedMessage_(payload){
     payload = payload || {};
     ensureHistoryExistsFromPayload_(payload);
-    persistReportNotedFromPayload_(payload);
+    handleReportSavedMessage_(payload);
   }
 
   function handleReportSavedMessage_(payload){
