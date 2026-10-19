@@ -1222,6 +1222,18 @@
     .set-card + .set-card{margin-top:12px}
     .set-check{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:1000;color:#071915}
     .set-check input{width:20px;height:20px;accent-color:#0f8f83}
+    .set-switch{justify-content:space-between}
+    .set-check .set-switch-input{
+      appearance:none;width:46px;height:26px;flex-shrink:0;margin:0;
+      border:2px solid #94a3b8;border-radius:999px;cursor:pointer;
+      background:#e2e8f0 radial-gradient(circle at 11px 50%,#fff 8px,transparent 9px);
+      transition:background-color .2s,border-color .2s;
+    }
+    .set-check .set-switch-input:checked{
+      border-color:#0f8f83;
+      background:#0f8f83 radial-gradient(circle at 31px 50%,#fff 8px,transparent 9px);
+    }
+    .set-switch-input:focus-visible{outline:3px solid #5eead4;outline-offset:3px}
     .seg{
       display:flex;
       gap:10px;
@@ -1692,7 +1704,7 @@
   <div class="set-modal" role="dialog" aria-modal="true">
     <div class="set-bar">
       <div class="set-title">⚙️ Settings</div>
-      <div class="set-sub">ตั้งค่าการนำทาง</div>
+      <div class="set-sub">ตั้งค่าการใช้งาน</div>
       <button id="setClose" class="set-close" type="button">ปิด</button>
     </div>
 
@@ -1720,6 +1732,16 @@
           <small>คำนวณและแสดงเส้นจากตำแหน่งปัจจุบันไปยังร้านเมื่อกดนำทาง</small>
         </div>
         <label class="set-check"><input id="showWebRoute" type="checkbox"> แสดงเส้นทางบนเว็บ</label>
+      </div>
+      <div class="set-card">
+        <div class="set-h">
+          <strong>SAVE + ไปแล้ว</strong>
+          <small>เมื่อกด SAVE ใน Report ให้บันทึกรายงานและทำเครื่องหมายร้านว่าไปแล้วด้วย</small>
+        </div>
+        <label class="set-check set-switch">
+          SAVE + ไปแล้ว
+          <input id="saveAndVisit" class="set-switch-input" type="checkbox" role="switch" aria-label="SAVE + ไปแล้ว">
+        </label>
       </div>
       <div class="set-card">
         <div class="set-h">
@@ -2307,7 +2329,7 @@
   var SETTINGS = loadSettings_();
 
   function loadSettings_(){
-    var def = { navPriority: 'linkFirst', showWebRoute: true, gpsMode: 'normal' };
+    var def = { navPriority: 'linkFirst', showWebRoute: true, gpsMode: 'normal', saveAndVisit: false };
     try{
       var raw = localStorage.getItem(SETTINGS_KEY);
       if(!raw) return def;
@@ -2315,7 +2337,7 @@
       if(!obj || typeof obj !== 'object') return def;
       var v = (obj.navPriority === 'latLngFirst') ? 'latLngFirst' : 'linkFirst';
       var gpsMode = obj.gpsMode === 'realtime' ? 'realtime' : 'normal';
-      return { navPriority: v, showWebRoute: obj.showWebRoute !== false, gpsMode: gpsMode };
+      return { navPriority: v, showWebRoute: obj.showWebRoute !== false, gpsMode: gpsMode, saveAndVisit: obj.saveAndVisit === true };
     }catch(e){
       return def;
     }
@@ -2331,6 +2353,7 @@
     var radios = document.querySelectorAll('input[name="navPriority"]');
     radios.forEach(function(r){ r.checked = (r.value === v); });
     $('showWebRoute').checked = !(SETTINGS && SETTINGS.showWebRoute === false);
+    $('saveAndVisit').checked = !!(SETTINGS && SETTINGS.saveAndVisit);
     var gpsMode = (SETTINGS && SETTINGS.gpsMode) === 'realtime' ? 'realtime' : 'normal';
     document.querySelectorAll('input[name="gpsMode"]').forEach(function(r){ r.checked = (r.value === gpsMode); });
 
@@ -2349,7 +2372,7 @@
     v = (v === 'latLngFirst') ? 'latLngFirst' : 'linkFirst';
     var gpsSel = document.querySelector('input[name="gpsMode"]:checked');
     var gpsMode = gpsSel && gpsSel.value === 'realtime' ? 'realtime' : 'normal';
-    var next = { navPriority: v, showWebRoute: $('showWebRoute').checked, gpsMode: gpsMode };
+    var next = { navPriority: v, showWebRoute: $('showWebRoute').checked, gpsMode: gpsMode, saveAndVisit: $('saveAndVisit').checked };
     saveSettings_(next);
     if(!next.showWebRoute) clearWebRoute_();
     if(map) renderMap();
@@ -4834,7 +4857,7 @@
 
     // Persist first. This also protects the short interval before an iframe postMessage
     // is processed and keeps a newer local edit from being overwritten by Sheet data.
-    queueNotedForSync_(placeId, notedStr, sheetName);
+    if(!queueNotedForSync_(placeId, notedStr, sheetName)) return false;
     updateLocalNotedState_(placeId, notedStr, sheetName);
     saveNotedToApiSilent_(placeId, notedStr, sheetName);
     return true;
@@ -4847,7 +4870,13 @@
   }
 
   function handleReportSavedMessage_(payload){
-    persistReportNotedFromPayload_(payload);
+    var ctx = resolveSafeReportCopyContext_(payload);
+    if(!persistReportNotedFromPayload_(payload)) return;
+    if(!SETTINGS.saveAndVisit || !ctx || ctx.sheetName !== String(CURRENT_SHEET || '')) return;
+    var place = PLACES.find(function(item){ return String(item.id) === ctx.placeId; });
+    if(!place || place.visited || PENDING.has(ctx.placeId)) return;
+    var snap = applyOptimisticVisited_(ctx.placeId);
+    if(snap) commitVisited_(ctx.placeId, snap.sheet);
   }
 
   function renderFromCacheIfAny_(sheetName){
