@@ -8,7 +8,9 @@ assert.ok(
   "snapshot reconciliation must not deactivate every team on every pull",
 );
 assert.ok(source.includes("team_id NOT IN ("), "teams must deactivate only when absent");
-assert.ok(source.includes("store_id NOT IN ("), "stores must deactivate only when absent");
+assert.ok(source.includes("if (missingIds.length)"), "deactivation must run only for missing stores");
+assert.ok(source.includes("if (!changedStores.length) continue;"), "unchanged stores must not be upserted");
+assert.ok(source.includes("store_id IN (SELECT value FROM json_each(?))"), "only absent stores may deactivate");
 assert.ok(
   source.includes("WHERE stores.master_version IS NOT excluded.master_version"),
   "store upsert must skip unchanged rows",
