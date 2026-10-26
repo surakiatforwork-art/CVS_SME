@@ -1125,6 +1125,10 @@ async function legacyFreshSheetSnapshot_(env) {
         lastVisitedDate:String(place?.lastVisitedDate ?? ""),
         route:String(place?.route ?? ""),
         noted:String(place?.noted ?? ""),
+        // Forward source-edit metadata when the legacy bridge supplies it.
+        // Missing metadata remains a safe conflict, never a synthetic edit time.
+        fieldMeta:place?.fieldMeta && typeof place.fieldMeta === "object" && !Array.isArray(place.fieldMeta)
+          ? place.fieldMeta : {},
       };
     }).filter(store => store.id && store.name);
     return {teamId, name:teamId, stores};
