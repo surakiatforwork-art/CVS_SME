@@ -98,7 +98,7 @@
         let summary={};try{summary=JSON.parse(row.summary_json||'{}')}catch(_){}
         line.textContent=time+' · '+row.trigger+' · '+row.status+
           (row.status==='done'?' · ส่ง '+Number(summary.outbound?.processed||0)+
-          ' · ค้าง '+Number(summary.pending||0):'')+
+          ' · ค้าง '+Number(summary.pending||0)+' · LWW '+Number(summary.inbound?.lwwResolved||0):'')+
           (row.error?' · '+row.error:'');
         el.appendChild(line);
       }

@@ -833,6 +833,7 @@ async function runSyncCycle(env, trigger = "scheduled", force = false) {
           storesChanged:Number(inbound.storesChanged || 0),
           teamsReconciled:Number(inbound.teamsReconciled || 0),
           conflicts:Number(inbound.conflicts || 0),
+          lwwResolved:Number(inbound.lwwResolved || 0),
         },outbound:{processed:Number(outbound.processed || 0)},
         pending:Number(counts.pending || 0)+Number(counts.error || 0),
         conflicts:Number(counts.dead || 0),
@@ -1343,7 +1344,7 @@ async function handleSheetSnapshot(request, env) {
     ).bind(JSON.stringify([...changedTeamIds])).all(),
     env.DB.prepare("SELECT account,items_json,version,sheet_version,updated_at FROM report_config_sets").all(),
     env.DB.prepare(
-      `SELECT id,action,team_id,store_id,account,status,last_error
+      `SELECT id,action,team_id,store_id,account,status,last_error,created_at
          FROM sync_outbox WHERE status!='done'`
     ).all(),
   ]);
@@ -1360,6 +1361,17 @@ async function handleSheetSnapshot(request, env) {
   const supersedeIds = [];
   const deadConflictJobs = new Map();
   const concurrentEdits = new Set();
+  const sheetWinningKeys = new Set();
+  const d1WinningKeys = new Map();
+  const mergeAudit = [];
+  const fieldJobs = new Map();
+  for (const job of unresolvedResult.results || []) {
+    const field=outboxField_(job.action);
+    if (!field || !job.team_id || job.action==="resetVisitedAll") continue;
+    const key=storeFieldKey_(job.team_id,job.store_id,field);
+    if (!fieldJobs.has(key)) fieldJobs.set(key,[]);
+    fieldJobs.get(key).push(job);
+  }
   for (const row of unresolvedResult.results || []) {
     const field = outboxField_(row.action);
     // A dead projection is a durable conflict; never silently promote the Sheet over D1.
@@ -1426,31 +1438,72 @@ async function handleSheetSnapshot(request, env) {
       const sheetRouteVersion = await hashVersion(sheetRoute);
       const sheetLocationVersion = await hashVersion(sheetLocationRaw);
       const sheetVisitVersion = await hashVersion(sheetVisited + "|" + sheetLastDate);
+      // Field-Level LWW: unrelated edits to the same store must merge.
+      const sourceWins = new Set();
       if (old) {
         const checks = [
           ["noted",blockNoted,sheetNotedVersion,"sheet_noted_version","noted_version"],
           ["route",blockRoute,sheetRouteVersion,"sheet_route_version","route_version"],
           ["location",blockLocation,sheetLocationVersion,"sheet_location_version","location_version"],
-          ["visit",blockVisit,sheetVisitVersion,"sheet_visit_version","visit_version"],
+          ["visit",blockVisit,sheetVisitVersion,"sheet_visit_version","visit_version"]
         ];
         for (const [field,blocked,incoming,shadow,local] of checks) {
-          if (blocked && incoming !== String(old[shadow] || "") &&
-              incoming !== String(old[local] || "")) {
-            concurrentEdits.add(storeFieldKey_(teamId,id,field));
-            if (field === "visit") concurrentEdits.add(storeFieldKey_(teamId,"*","visit"));
+          if (!blocked || incoming === String(old[shadow] || "") ||
+              incoming === String(old[local] || "")) continue;
+          const key=storeFieldKey_(teamId,id,field);
+          const jobs=(fieldJobs.get(key)||[])
+            .filter(j=>j.status==="pending" || j.status==="error");
+          const latest=jobs.reduce((a,b)=>!a || String(b.created_at||"")>String(a.created_at||"")?b:a,null);
+          const meta=raw.fieldMeta?.[field];
+          const sheetMs=Date.parse(String(meta?.changedAt||""));
+          const d1Ms=Date.parse(String(latest?.created_at||""));
+          const validSheet=meta && meta.version===incoming && Number.isFinite(sheetMs)
+            && sheetMs>0 && sheetMs<=Date.now()+60000;
+          const validD1=Number.isFinite(d1Ms) && d1Ms>0;
+          if (validSheet && validD1 && sheetMs!==d1Ms) {
+            const winner=sheetMs>d1Ms?"sheets":"d1";
+            if (winner==="sheets") {
+              sheetWinningKeys.add(key);sourceWins.add(field);
+            } else if (field!=="visit" && !env.LEGACY_API_URL) {
+              d1WinningKeys.set(key,incoming);
+            } else {
+              concurrentEdits.add(key);
+            }
+            if (sheetWinningKeys.has(key)||d1WinningKeys.has(key)) {
+              mergeAudit.push({teamId,storeId:id,field,winner,
+                sheetChangedAt:meta.changedAt,d1ChangedAt:latest.created_at,
+                sheetVersion:incoming,d1Version:String(old[local]||""),
+                d1Value:field==="noted"?String(old.noted||""):
+                  field==="route"?String(old.route||""):
+                  field==="location"?String(old.location_raw||""):
+                  JSON.stringify({visited:Number(old.visited||0),lastVisitedDate:String(old.last_visited_date||"")}),
+                sheetValue:field==="noted"?sheetNoted:
+                  field==="route"?sheetRoute:
+                  field==="location"?sheetLocationRaw:
+                  JSON.stringify({visited:sheetVisited,lastVisitedDate:sheetLastDate})});
+            }
+          } else concurrentEdits.add(key);
+          if (field==="visit" && concurrentEdits.has(key)) {
+            concurrentEdits.add(storeFieldKey_(teamId,"*","visit"));
           }
         }
       }
+      const effectiveBlockNoted=blockNoted&&!sourceWins.has("noted");
+      const effectiveBlockRoute=blockRoute&&!sourceWins.has("route");
+      const effectiveBlockLocation=blockLocation&&!sourceWins.has("location");
+      const effectiveBlockVisit=blockVisit&&!sourceWins.has("visit");
       const supersede = (field, changed) => {
         if (changed) supersedeIds.push(...(deadConflictJobs.get(storeFieldKey_(teamId,id,field)) || []));
       };
       // An unchanged Sheet shadow means this snapshot is merely observing an
       // unprojected D1 write; only a changed Sheet value is authoritative.
-      const noted = blockNoted && old ? String(old.noted || "") : old && sheetNotedVersion === String(old.sheet_noted_version) ? String(old.noted || "") : sheetNoted;
-      const route = blockRoute && old ? String(old.route || "") : old && sheetRouteVersion === String(old.sheet_route_version) ? String(old.route || "") : sheetRoute;
-      const locationRaw = blockLocation && old ? String(old.location_raw || "") : old && sheetLocationVersion === String(old.sheet_location_version) ? String(old.location_raw || "") : sheetLocationRaw;
-      const visited = blockVisit && old ? Number(old.visited || 0) : old && sheetVisitVersion === String(old.sheet_visit_version) ? Number(old.visited || 0) : sheetVisited;
-      const lastVisitedDate = blockVisit && old ? String(old.last_visited_date || "") : old && sheetVisitVersion === String(old.sheet_visit_version) ? String(old.last_visited_date || "") : sheetLastDate;
+      const noted = effectiveBlockNoted && old ? String(old.noted || "") : old && sheetNotedVersion === String(old.sheet_noted_version) ? String(old.noted || "") : sheetNoted;
+      const route = effectiveBlockRoute && old ? String(old.route || "") : old && sheetRouteVersion === String(old.sheet_route_version) ? String(old.route || "") : sheetRoute;
+      const locationRaw = effectiveBlockLocation && old ? String(old.location_raw || "") : old && sheetLocationVersion === String(old.sheet_location_version) ? String(old.location_raw || "") : sheetLocationRaw;
+      const visited = effectiveBlockVisit && old ? Number(old.visited || 0) : old && sheetVisitVersion === String(old.sheet_visit_version) ? Number(old.visited || 0) : sheetVisited;
+      const lastVisitedDate = effectiveBlockVisit && old ? String(old.last_visited_date || "") :
+        old && sheetVisitVersion === String(old.sheet_visit_version) ? String(old.last_visited_date || "") :
+        (sheetLastDate || String(old?.last_visited_date || ""));
       if (old) {
         supersede("noted", sheetNotedVersion !== String(old.sheet_noted_version));
         supersede("route", sheetRouteVersion !== String(old.sheet_route_version));
@@ -1500,10 +1553,10 @@ async function handleSheetSnapshot(request, env) {
         master_version:masterVersion, noted_version:notedVersion,
         route_version:routeVersion, location_version:locationVersion,
         visit_version:visitVersion, source_active:1,
-        sheet_noted_version: blockNoted && old ? String(old.sheet_noted_version) : sheetNotedVersion,
-        sheet_route_version: blockRoute && old ? String(old.sheet_route_version) : sheetRouteVersion,
-        sheet_location_version: blockLocation && old ? String(old.sheet_location_version) : sheetLocationVersion,
-        sheet_visit_version: blockVisit && old ? String(old.sheet_visit_version) : sheetVisitVersion,
+        sheet_noted_version: effectiveBlockNoted && old ? String(old.sheet_noted_version) : sheetNotedVersion,
+        sheet_route_version: effectiveBlockRoute && old ? String(old.sheet_route_version) : sheetRouteVersion,
+        sheet_location_version: effectiveBlockLocation && old ? String(old.sheet_location_version) : sheetLocationVersion,
+        sheet_visit_version: effectiveBlockVisit && old ? String(old.sheet_visit_version) : sheetVisitVersion,
         updated_at:unchanged ? String(old.updated_at || now) : now,
       });
     }
@@ -1688,6 +1741,43 @@ async function handleSheetSnapshot(request, env) {
     ).bind(JSON.stringify(normalizedConfig)));
   }
 
+  // Supersede older writes at field scope; retain exactly one latest D1
+  // operation, rebased to the observed Sheet version (bridge CAS).
+  const lwwObsolete=[];
+  const lwwRebases=[];
+  for (const [key,jobs] of fieldJobs) {
+    const active=jobs.filter(j=>["pending","error"].includes(j.status))
+      .sort((a,b)=>Number(a.id)-Number(b.id));
+    if (!active.length) continue;
+    if (sheetWinningKeys.has(key)) {
+      lwwObsolete.push(...active.map(j=>Number(j.id)));
+    } else if (d1WinningKeys.has(key)) {
+      lwwObsolete.push(...active.slice(0,-1).map(j=>Number(j.id)));
+      lwwRebases.push({id:Number(active[active.length-1].id),baseVersion:d1WinningKeys.get(key)});
+    }
+  }
+  if (lwwObsolete.length) {
+    statements.push(env.DB.prepare(
+      `UPDATE sync_outbox SET status='done',last_error='SUPERSEDED_BY_NEWER_FIELD',
+       updated_at=? WHERE id IN (SELECT value FROM json_each(?))
+       AND status IN ('pending','error')`
+    ).bind(now,JSON.stringify(lwwObsolete)));
+  }
+  for (const job of lwwRebases) {
+    statements.push(env.DB.prepare(
+      `UPDATE sync_outbox SET
+        payload_json=json_set(payload_json,'$.baseVersion',?),
+        status='pending',attempt_count=0,next_attempt_at=?,updated_at=?
+        WHERE id=? AND status IN ('pending','error')`
+    ).bind(job.baseVersion,now,now,job.id));
+  }
+  for (const decision of mergeAudit) {
+    statements.push(env.DB.prepare(
+      `INSERT INTO audit_events(event_type,origin,team_id,store_id,payload_json,created_at)
+       VALUES('field_lww','sheet_reconcile',?,?,?,?)`
+    ).bind(decision.teamId,decision.storeId,JSON.stringify(decision),now));
+  }
+
   // Refuse an outbound projection when the same field has changed on Sheets.
   // Keep both values, flag the job for admin resolution; never overwrite silently.
   const conflictedIds = [...new Set((unresolvedResult.results || [])
@@ -1721,6 +1811,7 @@ async function handleSheetSnapshot(request, env) {
     configAccounts:normalizedConfig.length, configItems:configItemCount,
     superseded:uniqueSupersedeIds.length,
     snapshotHash, teamHashes, conflicts:conflictedIds.length,
+    lwwResolved:mergeAudit.length,
     teamsReconciled:changedTeamIds.size, storesChanged,
   };
   statements.push(env.DB.prepare(
