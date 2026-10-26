@@ -6,7 +6,7 @@
   "workers_dev": true,
   "vars": {
     "ENVIRONMENT": "production",
-    "LEGACY_API_URL": "https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec",
+    "BRIDGE_URL": "https://script.google.com/macros/s/AKfycby-MvdvO9k-4ShXJL0yMIEEV1ziZltsRExLZxGnXCPvphtkW87McLUYCByhUFyuS04V/exec",
     "BRIDGE_TIMEOUT_MS": "45000",
     "SHEET_PULL_INTERVAL_MIN": "60",
     "ENABLE_EDGE_CACHE": "0",

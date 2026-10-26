@@ -1,0 +1,1 @@
+{ "timeZone": "Asia/Bangkok", "dependencies": {}, "exceptionLogging": "STACKDRIVER", "runtimeVersion": "V8", "executionApi": {"access":"MYSELF"}, "webapp":{"access":"ANYONE_ANONYMOUS","executeAs":"USER_DEPLOYING"}}
