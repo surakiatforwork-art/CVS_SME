@@ -57,6 +57,31 @@ export default {
         return withCors(await backendStatus(env), request, env);
       }
 
+      if (request.method === "POST" && url.pathname === "/internal/sync") {
+        if (String(auth.role || "") !== "admin") {
+          return withCors(json({ok:false,error:"ADMIN_REQUIRED"},403), request, env);
+        }
+        if (env.ENABLE_ADMIN_MUTATIONS !== "1") {
+          return withCors(json({ok:false,error:"ADMIN_MUTATIONS_DISABLED"},403), request, env);
+        }
+        const body = await parseJsonBody(request);
+        const result = await runSyncCycle(env, "manual", body.force === true);
+        return withCors(json(result, result.ok ? 200 : (result.busy ? 409 : 502)), request, env);
+      }
+
+      if (request.method === "GET" && url.pathname === "/internal/sync-history") {
+        if (String(auth.role || "") !== "admin") {
+          return withCors(json({ok:false,error:"ADMIN_REQUIRED"},403), request, env);
+        }
+        const {results: runs = []} = await env.DB.prepare(
+          "SELECT id,trigger,status,started_at,finished_at,summary_json,error FROM sync_runs ORDER BY started_at DESC LIMIT 15"
+        ).all();
+        const {results: conflicts = []} = await env.DB.prepare(
+          "SELECT id,action,team_id,store_id,account,last_error,updated_at FROM sync_outbox WHERE status='dead' ORDER BY id DESC LIMIT 25"
+        ).all();
+        return withCors(json({ok:true,runs,conflicts}), request, env);
+      }
+
       if (request.method === "POST" && url.pathname === "/internal/pull-sheet") {
         if (!["admin","service"].includes(String(auth.role || ""))) {
           return withCors(json({ok:false,error:"ADMIN_REQUIRED"},403), request, env);
@@ -150,12 +175,10 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(processOutbox(env, 20));
-    const interval = Math.max(5, Number(env.SHEET_PULL_INTERVAL_MIN || 15));
-    const scheduledAt = Number(event?.scheduledTime || Date.now());
-    if (new Date(scheduledAt).getUTCMinutes() % interval === 0) {
-      ctx.waitUntil(pullFreshSheetSnapshot(env));
-    }
+    // One bidirectional synchronization cycle per hour. Data edits remain local to D1.
+    const scheduledAt = new Date(Number(event?.scheduledTime || Date.now()));
+    const force = scheduledAt.getUTCHours() === 18; // daily deep reconciliation (01:00 Bangkok)
+    ctx.waitUntil(runSyncCycle(env, "scheduled", force));
   },
 };
 
@@ -389,7 +412,6 @@ async function mutateStoreField(env, spec, ctx) {
     });
   }
 
-  ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
 
@@ -486,7 +508,6 @@ async function mutateLocation(env, teamId, storeId, body, requestId, ctx) {
     });
   }
 
-  ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
 
@@ -569,7 +590,6 @@ async function markVisited(env, teamId, storeId, requestId, ctx) {
       currentVersion:fresh?.visit_version || ""
     });
   }
-  ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
 
@@ -642,7 +662,6 @@ async function resetVisits(env, teamId, requestId, ctx) {
     if (recovered) return json(recovered);
     throw err;
   }
-  ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
 async function saveReportConfig(env, accountRaw, body, requestId, ctx) {
@@ -747,7 +766,6 @@ async function saveReportConfig(env, accountRaw, body, requestId, ctx) {
       currentVersion: fresh?.version || "",
     });
   }
-  ctx.waitUntil(processOutbox(env, 2));
   return json(response);
 }
 
@@ -777,7 +795,73 @@ async function resolveSimpleIdempotency(env, requestId, requestHash) {
   throw new HttpError(409, "IDEMPOTENCY_IN_PROGRESS", "Request is still being resolved");
 }
 
-async function processOutbox(env, limit = 10) {
+async function runSyncCycle(env, trigger = "scheduled", force = false) {
+  if (!env.DB || !bridgeConfigured_(env) || !env.SHEET_SYNC_SECRET) {
+    return {ok:false,error:"SYNC_NOT_CONFIGURED"};
+  }
+  const owner = crypto.randomUUID();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const leaseUntil = new Date(now.getTime() + 15*60*1000).toISOString();
+  const lock = await env.DB.prepare(
+    `UPDATE sync_leases SET owner=?,lease_until=?,updated_at=?
+       WHERE name='sync-cycle' AND lease_until<=?`
+  ).bind(owner,leaseUntil,nowIso,nowIso).run();
+  if (Number(lock?.meta?.changes || 0) !== 1) {
+    return {ok:false,busy:true,error:"SYNC_ALREADY_RUNNING"};
+  }
+  const runId = owner;
+  try {
+    await env.DB.prepare(
+      "INSERT INTO sync_runs(id,trigger,status,started_at) VALUES(?,?,'running',?)"
+    ).bind(runId,trigger,nowIso).run();
+    try {
+      // Read upstream first; conflicting Sheet edits are marked before any outbound writes.
+      const inbound = await pullFreshSheetSnapshot(env, force);
+      if (!inbound || inbound.ok !== true) {
+        throw new Error(inbound?.error || "SHEET_PULL_FAILED");
+      }
+      const outbound = await processOutbox(env, 100, trigger === "manual");
+      if (outbound.busy || outbound.leaseLost) throw new Error("OUTBOX_LOCKED");
+      const {results: statuses = []} = await env.DB.prepare(
+        "SELECT status,COUNT(*) AS n FROM sync_outbox WHERE status!='done' GROUP BY status"
+      ).all();
+      const counts = Object.fromEntries(statuses.map(row=>[row.status,Number(row.n)]));
+      const summary = {
+        ok:true,runId,trigger,force,inbound:{
+          unchanged: Boolean(inbound.unchanged),
+          storesChanged:Number(inbound.storesChanged || 0),
+          teamsReconciled:Number(inbound.teamsReconciled || 0),
+          conflicts:Number(inbound.conflicts || 0),
+        },outbound:{processed:Number(outbound.processed || 0)},
+        pending:Number(counts.pending || 0)+Number(counts.error || 0),
+        conflicts:Number(counts.dead || 0),
+      };
+      await env.DB.prepare(
+        "UPDATE sync_runs SET status='done',finished_at=?,summary_json=? WHERE id=?"
+      ).bind(new Date().toISOString(),JSON.stringify(summary),runId).run();
+      if (force) {
+        // Keep operational history for ninety days; audit_events remain untouched.
+        await env.DB.prepare("DELETE FROM sync_runs WHERE started_at<?")
+          .bind(new Date(Date.now()-90*24*60*60*1000).toISOString()).run();
+      }
+      return summary;
+    } catch(error) {
+      const message=String(error?.message || error).slice(0,500);
+      await env.DB.prepare(
+        "UPDATE sync_runs SET status='failed',finished_at=?,error=? WHERE id=?"
+      ).bind(new Date().toISOString(),message,runId).run();
+      return {ok:false,runId,error:"SYNC_FAILED",message};
+    }
+  } finally {
+    await env.DB.prepare(
+      `UPDATE sync_leases SET owner='',lease_until='1970-01-01T00:00:00.000Z',
+       updated_at=? WHERE name='sync-cycle' AND owner=?`
+    ).bind(new Date().toISOString(),owner).run();
+  }
+}
+
+async function processOutbox(env, limit = 10, forceDue = false) {
   if (!env.DB || !bridgeConfigured_(env)) return { processed: 0 };
 
   const owner = crypto.randomUUID();
@@ -827,13 +911,13 @@ async function processOutbox(env, limit = 10) {
           ORDER BY id LIMIT 1`
       ).first();
       if (!job) break;
-      if (String(job.next_attempt_at || "") > due) break;
+      if (!forceDue && String(job.next_attempt_at || "") > due) break;
 
       const claimedAt = new Date().toISOString();
       const claim = await env.DB.prepare(
         `UPDATE sync_outbox SET status='processing',updated_at=?
-          WHERE id=? AND status IN ('pending','error') AND next_attempt_at<=?`
-      ).bind(claimedAt, job.id, due).run();
+          WHERE id=? AND status IN ('pending','error') AND (next_attempt_at<=? OR ?=1)`
+      ).bind(claimedAt, job.id, due, forceDue ? 1 : 0).run();
       if (Number(claim?.meta?.changes || 0) !== 1) continue;
 
       let params = {};
@@ -878,6 +962,7 @@ async function processOutbox(env, limit = 10) {
               SET status=?,attempt_count=?,last_error=?,next_attempt_at=?,updated_at=?
             WHERE id=?`
         ).bind(attempts >= 8 ? 'dead' : 'error', attempts, String(err?.message || err).slice(0,500), attempts >= 8 ? farFuture() : next, new Date().toISOString(), job.id).run();
+        break; // preserve projection order, never retry an error repeatedly in one cycle
       }
     }
     return { processed };
@@ -890,7 +975,7 @@ async function processOutbox(env, limit = 10) {
   }
 }
 
-async function pullFreshSheetSnapshot(env) {
+async function pullFreshSheetSnapshot(env, force = false) {
   if (!env.DB || !bridgeConfigured_(env) || !env.SHEET_SYNC_SECRET) {
     return {ok:false,skipped:true,error:"SHEET_PULL_NOT_CONFIGURED"};
   }
@@ -913,6 +998,8 @@ async function pullFreshSheetSnapshot(env) {
     }
   }
   if (!payload) throw lastBridgeError || new Error("Sheet snapshot pull failed");
+  // Preserve complete snapshot semantics for third-party Sheet writers.
+  payload = {...payload, forceReconciliation: force === true};
 
   const eventId = "worker-pull:" + String(payload.generatedAt || "") + ":" + crypto.randomUUID();
   const ts = Date.now();
@@ -1216,6 +1303,35 @@ async function handleSheetSnapshot(request, env) {
     throw new HttpError(403,"SCOPE_FORBIDDEN","Snapshot includes a report account outside the allowed production scope");
   }
 
+  // Compute the fingerprint from the complete Sheet payload, not generatedAt.
+  // A no-op snapshot never scans the stores or report tables in D1.
+  const snapshotHash = await hashVersion(JSON.stringify({
+    teams: teamsInput, reportConfigSets: configInput,
+  }));
+  if (payload.forceReconciliation !== true && latestSnapshot?.payload_json) {
+    try {
+      if (JSON.parse(latestSnapshot.payload_json).snapshotHash === snapshotHash) {
+        return json({ok:true,unchanged:true,eventId,generatedAt,storesChanged:0,conflicts:0});
+      }
+    } catch {}
+  }
+
+  // Per-team fingerprints make a one-team Sheet edit read only that team's D1 stores.
+  let previousTeamHashes = {};
+  if (latestSnapshot?.payload_json) {
+    try { previousTeamHashes = JSON.parse(latestSnapshot.payload_json).teamHashes || {}; }
+    catch {}
+  }
+  const teamHashes = {};
+  const changedTeamIds = new Set();
+  for (const team of teamsInput) {
+    const id = String(team.teamId || team.sheet || "").trim();
+    teamHashes[id] = await hashVersion(JSON.stringify(team));
+    if (payload.forceReconciliation === true || previousTeamHashes[id] !== teamHashes[id]) {
+      changedTeamIds.add(id);
+    }
+  }
+
   const now = new Date().toISOString();
   const [existingStoresResult, existingConfigResult, unresolvedResult] = await Promise.all([
     env.DB.prepare(
@@ -1223,8 +1339,8 @@ async function handleSheetSnapshot(request, env) {
               noted,route,visited,last_visited_date,master_version,noted_version,route_version,
               sheet_noted_version,sheet_route_version,sheet_location_version,sheet_visit_version,
               location_version,visit_version,source_active,updated_at
-         FROM stores`
-    ).all(),
+         FROM stores WHERE team_id IN (SELECT value FROM json_each(?))`
+    ).bind(JSON.stringify([...changedTeamIds])).all(),
     env.DB.prepare("SELECT account,items_json,version,sheet_version,updated_at FROM report_config_sets").all(),
     env.DB.prepare(
       `SELECT id,action,team_id,store_id,account,status,last_error
@@ -1243,10 +1359,11 @@ async function handleSheetSnapshot(request, env) {
   const configBlockers = new Set();
   const supersedeIds = [];
   const deadConflictJobs = new Map();
+  const concurrentEdits = new Set();
   for (const row of unresolvedResult.results || []) {
     const field = outboxField_(row.action);
-    const sheetReconciles = row.status === "dead" &&
-      ["VERSION_CONFLICT","INDETERMINATE_REQUIRES_RECONCILIATION"].includes(String(row.last_error || ""));
+    // A dead projection is a durable conflict; never silently promote the Sheet over D1.
+    const sheetReconciles = false;
     if (sheetReconciles) {
       const key = field === "reportConfig" ? "report\u0000" + String(row.account || "") :
         storeFieldKey_(row.team_id, row.action === "resetVisitedAll" ? "*" : row.store_id, field);
@@ -1274,6 +1391,12 @@ async function handleSheetSnapshot(request, env) {
     if (!teamId) throw new HttpError(400,"BAD_REQUEST","Missing teamId");
     const stores = Array.isArray(team.stores) ? team.stores : [];
     if (stores.length > 5000) throw new HttpError(400,"BAD_REQUEST","Too many stores");
+    // Unchanged teams were already validated in the previous completed snapshot.
+    if (!changedTeamIds.has(teamId)) {
+      normalizedTeams.push({team_id:teamId,name:String(team.name || teamId),source_sheet:teamId,active:1,updated_at:now});
+      storeCount += stores.length;
+      continue;
+    }
     const seen = new Set();
     const normalized = [];
 
@@ -1303,6 +1426,21 @@ async function handleSheetSnapshot(request, env) {
       const sheetRouteVersion = await hashVersion(sheetRoute);
       const sheetLocationVersion = await hashVersion(sheetLocationRaw);
       const sheetVisitVersion = await hashVersion(sheetVisited + "|" + sheetLastDate);
+      if (old) {
+        const checks = [
+          ["noted",blockNoted,sheetNotedVersion,"sheet_noted_version","noted_version"],
+          ["route",blockRoute,sheetRouteVersion,"sheet_route_version","route_version"],
+          ["location",blockLocation,sheetLocationVersion,"sheet_location_version","location_version"],
+          ["visit",blockVisit,sheetVisitVersion,"sheet_visit_version","visit_version"],
+        ];
+        for (const [field,blocked,incoming,shadow,local] of checks) {
+          if (blocked && incoming !== String(old[shadow] || "") &&
+              incoming !== String(old[local] || "")) {
+            concurrentEdits.add(storeFieldKey_(teamId,id,field));
+            if (field === "visit") concurrentEdits.add(storeFieldKey_(teamId,"*","visit"));
+          }
+        }
+      }
       const supersede = (field, changed) => {
         if (changed) supersedeIds.push(...(deadConflictJobs.get(storeFieldKey_(teamId,id,field)) || []));
       };
@@ -1386,6 +1524,18 @@ async function handleSheetSnapshot(request, env) {
     snapshotAccounts.add(account);
     if (configBlockers.has(account)) {
       const old = existingConfigs.get(account);
+      if (old) {
+        const incomingItems = (Array.isArray(set.items) ? set.items : []).map(item => ({
+          account, kind:String(item.kind || "").trim(), id:String(item.id || "").trim(),
+          sort:Number(item.sort || 0), active:item.active !== false,
+          data:item.data ?? {}, updatedAt:String(item.updatedAt || ""),
+        })).filter(x => x.kind && x.id).sort((a,b)=>a.sort-b.sort || a.id.localeCompare(b.id));
+        const incomingVersion = await hashVersion(JSON.stringify(incomingItems));
+        if (incomingVersion !== String(old.sheet_version || "") &&
+            incomingVersion !== String(old.version || "")) {
+          concurrentEdits.add("report\u0000" + account);
+        }
+      }
       if (old) normalizedConfig.push({
         account, items_json:String(old.items_json || "[]"),
         version:String(old.version || ""), sheet_version:String(old.sheet_version || ""), updated_at:String(old.updated_at || now),
@@ -1422,6 +1572,7 @@ async function handleSheetSnapshot(request, env) {
   );
 
   const statements = [];
+  let storesChanged = 0;
   const teamsJson = JSON.stringify(normalizedTeams);
   statements.push(env.DB.prepare(
     `UPDATE teams
@@ -1452,6 +1603,7 @@ async function handleSheetSnapshot(request, env) {
     "sheet_location_version", "sheet_visit_version", "source_active",
   ];
   for (const team of normalizedTeams) {
+    if (!changedTeamIds.has(team.team_id)) continue;
     const incomingStores = normalizedByTeam.get(team.team_id) || [];
     const snapshotIds = new Set(incomingStores.map(store => String(store.store_id)));
     const missingIds = [...existingStores.values()]
@@ -1459,6 +1611,7 @@ async function handleSheetSnapshot(request, env) {
         Number(old.source_active) === 1 && !snapshotIds.has(String(old.store_id)))
       .map(old => String(old.store_id));
     if (missingIds.length) {
+      storesChanged += missingIds.length;
       statements.push(env.DB.prepare(
         `UPDATE stores
             SET source_active=0,updated_at=?
@@ -1473,6 +1626,7 @@ async function handleSheetSnapshot(request, env) {
         String(old[col] ?? "") !== String(store[col] ?? ""));
     });
     if (!changedStores.length) continue;
+    storesChanged += changedStores.length;
     statements.push(env.DB.prepare(
       `INSERT INTO stores(
         team_id,store_id,name,location_raw,lat,lng,maps_url,account,number,account_name,
@@ -1534,6 +1688,24 @@ async function handleSheetSnapshot(request, env) {
     ).bind(JSON.stringify(normalizedConfig)));
   }
 
+  // Refuse an outbound projection when the same field has changed on Sheets.
+  // Keep both values, flag the job for admin resolution; never overwrite silently.
+  const conflictedIds = [...new Set((unresolvedResult.results || [])
+    .filter(row => ["pending","error"].includes(String(row.status || "")))
+    .filter(row => {
+      const field = outboxField_(row.action);
+      const key = field === "reportConfig" ? "report\u0000" + String(row.account || "") :
+        storeFieldKey_(row.team_id, row.action === "resetVisitedAll" ? "*" : row.store_id, field);
+      return concurrentEdits.has(key);
+    }).map(row => Number(row.id)))];
+  if (conflictedIds.length) {
+    statements.push(env.DB.prepare(
+      `UPDATE sync_outbox SET status='dead',last_error='CONCURRENT_SHEET_EDIT',
+        next_attempt_at=?,updated_at=?
+        WHERE id IN (SELECT value FROM json_each(?)) AND status IN ('pending','error')`
+    ).bind(farFuture(),now,JSON.stringify(conflictedIds)));
+  }
+
   const uniqueSupersedeIds = [...new Set(supersedeIds)];
   if (uniqueSupersedeIds.length) {
     statements.push(env.DB.prepare(
@@ -1548,6 +1720,8 @@ async function handleSheetSnapshot(request, env) {
     teams:normalizedTeams.length, stores:storeCount,
     configAccounts:normalizedConfig.length, configItems:configItemCount,
     superseded:uniqueSupersedeIds.length,
+    snapshotHash, teamHashes, conflicts:conflictedIds.length,
+    teamsReconciled:changedTeamIds.size, storesChanged,
   };
   statements.push(env.DB.prepare(
     "INSERT INTO sheet_inbound_events(event_id,payload_json,received_at) VALUES(?,?,?)"

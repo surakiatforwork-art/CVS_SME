@@ -13,6 +13,7 @@
 <main class="shell">
   <h1>ตั้งค่ารายงาน</h1><p class="hint">รายการนี้เป็น config กลางของแต่ละ account</p>
   <section class="card"><label>Account<select id="account"><option>7-ELEVEN</option><option>CJ MORE</option><option>LAWSON</option><option>MINI BIG C</option><option>VILLA MARKET</option><option>LOTUS'S GO FRESH</option><option>JIFFY</option><option>TOPS DAILY</option></select></label><div class="actions" style="margin-top:10px"><button class="soft" id="update">อัปเดท</button><button class="soft" id="sync">Sync</button></div><div class="status" id="status">กำลังโหลด...</div></section>
+  <section class="card" id="syncHistoryCard"><strong>ประวัติ Sync</strong><p class="hint" style="margin:8px 0">ข้อมูลย้อนหลังและรายการที่ต้องตรวจสอบ</p><div id="syncHistory" class="status" aria-live="polite">กด Sync เพื่อดูผลล่าสุด</div></section>
   <section class="card"><div class="tabs"><button class="active" data-kind="sku">สินค้า</button><button data-kind="summary">หัวข้อสรุป</button><button data-kind="promotion">สื่อโปรโมชั่น</button></div><div class="row" style="margin-top:14px"><strong class="grow" id="listTitle">สินค้า</strong></div><div id="list"></div></section>
   <div class="toolsMenu" id="toolsMenu" aria-hidden="true"><button id="toolSave">SAVE</button><button class="soft" id="toolReorder">จัดเรียง</button><button class="soft" id="toolAdd">+ เพิ่ม</button><button class="danger" id="toolCancel" hidden>ยกเลิก</button></div>
   <button id="toolsFab" style="position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));box-shadow:0 8px 22px #183c3966" aria-label="เปิดเครื่องมือ" aria-expanded="false"><span class="fabSymbol" aria-hidden="true">☰</span></button>
@@ -76,34 +77,103 @@
   function endDrag(event){if(!dragState||event.pointerId!==dragState.pointerId)return;dragState.ghost.remove();dragState=null}
   function applyDraggedOrder(){[...$('list').querySelectorAll('.item')].forEach((card,index)=>{const item=items.find(row=>row.kind===kind&&row.id===card.dataset.id);if(!item)return;if(kind==='sku'){item.data=item.data||{};item.data.formSort=index+1}else item.sort=index+1})}
   function endActiveDrag(){if(!dragState)return;dragState.ghost.remove();dragState=null}
-  async function toggleReorder(){if(!reordering){reorderSnapshot=new Map(visible().map(item=>[item.id,itemOrder(item)]));setReorderMode(true);setToolsOpen(true);status('ลากจากไอคอนหกจุดไปวางตำแหน่งใหม่ แล้วกด “เสร็จสิ้น”');return}if(dragState)return;applyDraggedOrder();reorderSnapshot=null;setReorderMode(false);persist();await sync()}
+  async function toggleReorder(){if(!reordering){reorderSnapshot=new Map(visible().map(item=>[item.id,itemOrder(item)]));setReorderMode(true);setToolsOpen(true);status('ลากจากไอคอนหกจุดไปวางตำแหน่งใหม่ แล้วกด “เสร็จสิ้น”');return}if(dragState)return;applyDraggedOrder();reorderSnapshot=null;setReorderMode(false);persist();await saveOnly()}
   function cancelReorder(){endActiveDrag();if(reorderSnapshot){items.filter(item=>item.kind===kind).forEach(item=>{const order=reorderSnapshot.get(item.id);if(order===undefined)return;if(kind==='sku'){item.data=item.data||{};item.data.formSort=order}else item.sort=order})}reorderSnapshot=null;setReorderMode(false);setToolsOpen(false);status('ยกเลิกการจัดเรียงแล้ว')}
   function open(item){editing=item||null;const d=item?.data||{},isSku=kind==='sku',nextSort=Math.max(0,...items.map(x=>x.sort||0))+10,nextFormSort=Math.max(0,...items.filter(x=>x.kind==='sku').map(x=>Number((x.data||{}).formSort)||x.sort||0))+10;$('formTitle').textContent=item?'แก้ไขรายการ':'เพิ่ม '+labelForKind();$('label').value=d.label||'';$('family').value=d.family||'SME';$('category').value=SKU_CATEGORIES.includes(d.category)?d.category:'';$('category').disabled=!isSku;$('formSort').value=d.formSort??(item?.sort??nextFormSort);$('formSort').disabled=!isSku;$('defaultFlag').value=d.defaultFlag||'';$('sort').value=item?.sort??nextSort;$('sort').disabled=isSku;$('remove').style.display=item?'block':'none';['familyWrap','categoryWrap','formSortWrap','flagWrap'].forEach(id=>$(id).style.display=isSku?'block':'none');$('sortWrap').style.display=isSku?'none':'block';$('modal').classList.add('open')}
   function close(){ $('modal').classList.remove('open') } function makeId(){return `${kind}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,7)}`}
   async function save(item){item.account=account();const index=items.findIndex(x=>x.kind===item.kind&&x.id===item.id);if(index<0)items.push(item);else items[index]=item;persist()}
   function sameConfig(remote, local){const key=x=>`${x.kind}:${x.id}`;const left=[...remote].sort((a,b)=>key(a).localeCompare(key(b)));const right=[...local].sort((a,b)=>key(a).localeCompare(key(b)));return left.length===right.length&&left.every((item,index)=>key(item)===key(right[index])&&item.sort===right[index].sort&&(item.active!==false)===(right[index].active!==false)&&JSON.stringify(item.data||{})===JSON.stringify(right[index].data||{}))}
   function makeRequestId(){return `rc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`}
+  async function refreshSyncHistory(){
+    if(!USE_WORKER)return;
+    try{
+      const data=await ADMIN_CLIENT.syncHistory();
+      const el=$('syncHistory');
+      el.replaceChildren();
+      const latest=(data.runs||[]).slice(0,5);
+      for(const row of latest){
+        const line=document.createElement('div');
+        line.style.cssText='margin:6px 0;line-height:1.5;border-bottom:1px solid var(--line);padding-bottom:6px';
+        const time=row.started_at?new Date(row.started_at).toLocaleString('th-TH'):'ไม่ทราบเวลา';
+        let summary={};try{summary=JSON.parse(row.summary_json||'{}')}catch(_){}
+        line.textContent=time+' · '+row.trigger+' · '+row.status+
+          (row.status==='done'?' · ส่ง '+Number(summary.outbound?.processed||0)+
+          ' · ค้าง '+Number(summary.pending||0):'')+
+          (row.error?' · '+row.error:'');
+        el.appendChild(line);
+      }
+      const unresolved=(data.conflicts||[]).filter(job=>job.last_error==='CONCURRENT_SHEET_EDIT');
+      if(unresolved.length){
+        const warning=document.createElement('div');
+        warning.style.color='var(--danger)';
+        warning.textContent='⚠️ พบข้อมูลชนกัน '+unresolved.length+
+          ' รายการ (แสดงล่าสุดสูงสุด 25 รายการ) — ยังไม่เขียนทับข้อมูล';
+        el.prepend(warning);
+      }
+      if(!latest.length&&!unresolved.length)el.textContent='ยังไม่มีประวัติ Sync';
+    }catch(e){
+      $('syncHistory').textContent='ไม่สามารถโหลดประวัติ Sync: '+(e.message||'เชื่อมต่อไม่สำเร็จ');
+    }
+  }
+  async function storePendingReportDraft(){
+    const currentAccount=account(),local=drafts[currentAccount];
+    if(!local)return false;
+    local.items=(local.items||[]).map(item=>({...item,account:currentAccount}));
+    local.requestId=local.requestId||makeRequestId();
+    drafts[currentAccount]=local;
+    localStorage.setItem(STORE,JSON.stringify(drafts));
+    const result=await ADMIN_CLIENT.saveReportConfig(
+      currentAccount,local.items,local.requestId,CONFIG_VERSIONS[currentAccount]||''
+    );
+    CONFIG_VERSIONS[currentAccount]=String(result.version||'');
+    const verified=await ADMIN_CLIENT.getReportConfig(currentAccount);
+    if(!sameConfig(verified.items||[],local.items))throw Error('ข้อมูลบน Worker ไม่ตรงกับ draft');
+    CONFIG_VERSIONS[currentAccount]=String(verified.version||CONFIG_VERSIONS[currentAccount]||'');
+    delete drafts[currentAccount];localStorage.setItem(STORE,JSON.stringify(drafts));
+    items=verified.items||[];includeBuiltin();render();
+    return true;
+  }
+  async function saveOnly(){
+    if(!USE_WORKER){await sync();return}
+    if(syncing)return;
+    syncing=true;setFabSyncing(true);
+    try{
+      status('กำลังบันทึกข้อมูลลง D1...');
+      const saved=await storePendingReportDraft();
+      status(saved?'บันทึกใน D1 แล้ว · รอ Sync ไป Google Sheets ตามรอบ 1 ชั่วโมง':'ไม่มีรายการเปลี่ยนแปลง');
+    }catch(e){
+      console.error('D1 save failed',e);
+      status('บันทึก D1 ไม่สำเร็จ · '+(e.message||'กรุณาลองใหม่'),true);
+    }finally{syncing=false;setFabSyncing(false)}
+  }
   async function sync(){
     if(syncing)return;
     const currentAccount=account(),local=drafts[currentAccount];
-    if(!local){status('ไม่มีรายการรอ Sync');return}
-    local.items=(local.items||[]).map((item)=>({...item,account:currentAccount}));
-    const requestId=local.requestId||makeRequestId();
-    local.requestId=requestId;drafts[currentAccount]=local;localStorage.setItem(STORE,JSON.stringify(drafts));
+    if(local){
+      local.items=(local.items||[]).map(item=>({...item,account:currentAccount}));
+      local.requestId=local.requestId||makeRequestId();
+      drafts[currentAccount]=local;localStorage.setItem(STORE,JSON.stringify(drafts));
+    }
+    const requestId=local?.requestId||'';
     syncing=true;setFabSyncing(true);
     try{
       if(USE_WORKER){
-        status('กำลังส่งข้อมูลผ่าน Worker...');
-        const result=await ADMIN_CLIENT.saveReportConfig(currentAccount,local.items,requestId,CONFIG_VERSIONS[currentAccount]||'');
-        CONFIG_VERSIONS[currentAccount]=String(result.version||'');
-        const confirmResult=await ADMIN_CLIENT.getReportConfig(currentAccount);
-        if(!sameConfig(confirmResult.items||[],local.items))throw Error('ข้อมูลบน Worker ไม่ตรงกับ draft');
-        CONFIG_VERSIONS[currentAccount]=String(confirmResult.version||CONFIG_VERSIONS[currentAccount]||'');
-        delete drafts[currentAccount];localStorage.setItem(STORE,JSON.stringify(drafts));
-        items=confirmResult.items||[];includeBuiltin();render();status('Sync แล้ว · Worker');
+        if(local){status('กำลังบันทึก draft ลง D1...');await storePendingReportDraft()}
+        status('กำลัง Sync ทั้งระบบระหว่าง D1 และ Google Sheets...');
+        const result=await ADMIN_CLIENT.syncNow(false);
+        await refreshSyncHistory();
+        const pushed=Number(result.outbound?.processed||0);
+        const changed=Number(result.inbound?.storesChanged||0);
+        const pending=Number(result.pending||0);
+        const conflicts=Number(result.conflicts||0);
+        status(
+          'Sync สำเร็จ · ส่งไป Sheets '+pushed+' รายการ · ตรวจพบการเปลี่ยนแปลง '+changed+
+          ' รายการ · รอส่ง '+pending+' · Conflict '+conflicts,
+          conflicts>0 || pending>0
+        );
         return;
       }
-
+      if(!local){status('ไม่มี draft รอ Sync (โหมด Legacy ยังไม่มี Full Sync)');return}
       const payload=JSON.stringify({action:'saveReportConfigBulk',items:local.items,requestId});
       let lastError;
       for(let sendAttempt=1;sendAttempt<=3;sendAttempt++){
@@ -135,7 +205,7 @@
     }finally{syncing=false;setFabSyncing(false)}
   }
   async function importSeed(){if(!confirm(`นำเข้ารายการเดิมทั้งหมดสำหรับ ${account()}?`))return;const frame=document.createElement('iframe');frame.hidden=true;frame.src='Report.html?configSeed=1';document.body.appendChild(frame);await new Promise((resolve,reject)=>{frame.onload=resolve;setTimeout(()=>reject(Error('อ่านรายการเดิมไม่สำเร็จ')),30000)});const seed=frame.contentWindow.__PT_REPORT_CONFIG_SEED;frame.remove();if(!seed)throw Error('ไม่พบรายการเดิม');const layouts=seed.copyLayouts[account()]||[];const positions=new Map();layouts.forEach((g,gi)=>g.ids.forEach((id,si)=>positions.set(id,{category:g.heading,sort:(gi+1)*1000+si})));const applies=s=>account()==='CJ MORE'?(s.accounts||[]).includes('CJ MORE'):!(s.accounts||[]).length||(s.accounts||[]).includes(account());const rows=[];seed.skuItems.filter(applies).forEach((s,i)=>{const p=positions.get(s.id);rows.push({kind:'sku',id:s.id,sort:p?.sort??i+1,active:true,data:{label:s.label,family:s.family,category:p?.category??(s.family==='SME'?'📍SMOOTH E':'📍DENTISTE'),defaultFlag:seed.defaultFlags[s.id]||''}})});seed.summaryTopics.forEach((x,i)=>rows.push({kind:'summary',id:x.id,sort:i+1,active:true,data:{label:x.label}}));seed.promotionMediaItems.forEach((x,i)=>rows.push({kind:'promotion',id:x.id,sort:i+1,active:true,data:{label:x.label}}));for(let i=0;i<rows.length;i++){status(`กำลังนำเข้า ${i+1}/${rows.length}...`);await save(rows[i])}await load();status(`นำเข้ารายการเดิม ${rows.length} รายการแล้ว`)}
-  document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{if(reordering)return;kind=b.dataset.kind;document.querySelectorAll('[data-kind]').forEach(x=>x.classList.toggle('active',x===b));render()});$('account').onchange=()=>{if(reordering)return;localStorage.setItem(ACCOUNT_STORE,account());load()};$('toolsFab').onclick=()=>setToolsOpen(!$('toolsMenu').classList.contains('open'));function closeToolsOnOutside(event){if(reordering||!$('toolsMenu').classList.contains('open'))return;if($('toolsMenu').contains(event.target)||$('toolsFab').contains(event.target))return;setToolsOpen(false)}document.addEventListener('pointerdown',closeToolsOnOutside);document.addEventListener('click',closeToolsOnOutside);$('toolAdd').onclick=()=>open(null);$('toolReorder').onclick=toggleReorder;$('toolCancel').onclick=cancelReorder;$('update').onclick=()=>drafts[account()]?status('มี draft รอ Sync กรุณา Sync ก่อน',true):load(true);$('sync').onclick=sync;$('toolSave').onclick=()=>{persist();setToolsOpen(false);sync()};$('close').onclick=close;$('modal').onclick=e=>{if(e.target===$('modal'))close()};$('list').addEventListener('pointerdown',startDrag);$('list').addEventListener('change',async e=>{const toggle=e.target.closest('[data-active-toggle]');if(!toggle||reordering)return;const item=items.find(row=>row.kind===kind&&row.id===toggle.dataset.activeToggle);if(!item)return;item.active=toggle.checked;await save(item);render()});document.addEventListener('pointermove',moveDrag,{passive:false});document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);$('list').onclick=async e=>{if(reordering)return;const edit=e.target.dataset.edit,id=e.target.dataset.id;if(edit)return open(items.find(x=>x.id===edit&&x.kind===kind));if(!id)return;const row=visible(),index=row.findIndex(x=>x.id===id),other=row[index+Number(e.target.dataset.move)];if(!other)return;const a=items.find(x=>x.kind===kind&&x.id===id),aOrder=itemOrder(a),otherOrder=itemOrder(other);if(kind==='sku'){a.data.formSort=otherOrder;other.data.formSort=aOrder}else{a.sort=otherOrder;other.sort= aOrder}await Promise.all([save(a),save(other)]);render()};$('form').onsubmit=async e=>{e.preventDefault();const item=editing||{account:account(),kind,id:makeId(),active:true};item.sort=item.sort??(Number($('sort').value)||0);item.data={label:$('label').value.trim(),family:$('family').value,category:$('category').value.trim(),formSort:kind==='sku'?(Number($('formSort').value)||item.sort):undefined,defaultFlag:$('defaultFlag').value};await save(item);close();render()};$('remove').onclick=()=>{if(!editing||!confirm('ลบรายการนี้?'))return;items=items.filter(x=>!(x.kind===editing.kind&&x.id===editing.id));persist();close();render()};load();
+  document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{if(reordering)return;kind=b.dataset.kind;document.querySelectorAll('[data-kind]').forEach(x=>x.classList.toggle('active',x===b));render()});$('account').onchange=()=>{if(reordering)return;localStorage.setItem(ACCOUNT_STORE,account());load()};$('toolsFab').onclick=()=>setToolsOpen(!$('toolsMenu').classList.contains('open'));function closeToolsOnOutside(event){if(reordering||!$('toolsMenu').classList.contains('open'))return;if($('toolsMenu').contains(event.target)||$('toolsFab').contains(event.target))return;setToolsOpen(false)}document.addEventListener('pointerdown',closeToolsOnOutside);document.addEventListener('click',closeToolsOnOutside);$('toolAdd').onclick=()=>open(null);$('toolReorder').onclick=toggleReorder;$('toolCancel').onclick=cancelReorder;$('update').onclick=()=>drafts[account()]?status('มี draft รอ Sync กรุณา Sync ก่อน',true):load(true);$('sync').onclick=sync;$('toolSave').onclick=()=>{persist();setToolsOpen(false);saveOnly()};$('close').onclick=close;$('modal').onclick=e=>{if(e.target===$('modal'))close()};$('list').addEventListener('pointerdown',startDrag);$('list').addEventListener('change',async e=>{const toggle=e.target.closest('[data-active-toggle]');if(!toggle||reordering)return;const item=items.find(row=>row.kind===kind&&row.id===toggle.dataset.activeToggle);if(!item)return;item.active=toggle.checked;await save(item);render();if(USE_WORKER)await saveOnly()});document.addEventListener('pointermove',moveDrag,{passive:false});document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);$('list').onclick=async e=>{if(reordering)return;const edit=e.target.dataset.edit,id=e.target.dataset.id;if(edit)return open(items.find(x=>x.id===edit&&x.kind===kind));if(!id)return;const row=visible(),index=row.findIndex(x=>x.id===id),other=row[index+Number(e.target.dataset.move)];if(!other)return;const a=items.find(x=>x.kind===kind&&x.id===id),aOrder=itemOrder(a),otherOrder=itemOrder(other);if(kind==='sku'){a.data.formSort=otherOrder;other.data.formSort=aOrder}else{a.sort=otherOrder;other.sort= aOrder}await Promise.all([save(a),save(other)]);render();if(USE_WORKER)await saveOnly()};$('form').onsubmit=async e=>{e.preventDefault();const item=editing||{account:account(),kind,id:makeId(),active:true};item.sort=item.sort??(Number($('sort').value)||0);item.data={label:$('label').value.trim(),family:$('family').value,category:$('category').value.trim(),formSort:kind==='sku'?(Number($('formSort').value)||item.sort):undefined,defaultFlag:$('defaultFlag').value};await save(item);close();render();if(USE_WORKER)await saveOnly()};$('remove').onclick=()=>{if(!editing||!confirm('ลบรายการนี้?'))return;items=items.filter(x=>!(x.kind===editing.kind&&x.id===editing.id));persist();close();render();if(USE_WORKER)saveOnly()};load();if(USE_WORKER)refreshSyncHistory();
 $('toolsFab').addEventListener('click',event=>event.stopPropagation());
 })();
 </script>

@@ -35,7 +35,7 @@ async function reconcile(existingStores, inputStores) {
         async first() { return null; },
         async run() { return {meta: {changes: 1}}; },
         async all() {
-          if (sql.includes("FROM stores") && !sql.includes("WHERE")) {
+          if (sql.includes("FROM stores")) {
             return {results: existingStores};
           }
           return {results: []};

@@ -8,7 +8,7 @@
     "ENVIRONMENT": "production",
     "LEGACY_API_URL": "https://script.google.com/macros/s/AKfycbwECEynatTTsTWMMsZh2r3EO5LBQkY4IhSjziXyAxx8kdx8o-ykpZDB3EtSUpUkA_z76Q/exec",
     "BRIDGE_TIMEOUT_MS": "45000",
-    "SHEET_PULL_INTERVAL_MIN": "15",
+    "SHEET_PULL_INTERVAL_MIN": "60",
     "ENABLE_EDGE_CACHE": "0",
     "ALLOWED_ORIGINS": "https://cvs-sme.vercel.app,https://surakiatforwork-art.github.io",
     "SESSION_TTL_SEC": "43200",
@@ -26,7 +26,7 @@
     }
   ],
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["0 * * * *"]
   },
   "observability": {
     "enabled": true,

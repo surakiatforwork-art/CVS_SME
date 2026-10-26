@@ -117,6 +117,13 @@
     }
 
     return {
+      syncNow:function(force){
+        return request('/internal/sync', {
+          method:'POST', headers:{'content-type':'application/json'},
+          body:JSON.stringify({force:force === true})
+        });
+      },
+      syncHistory:function(){ return request('/internal/sync-history',{method:'GET'}); },
       mode:function(){ return workerReady() ? 'worker' : 'apps-script'; },
       listTeams:function(){ return workerReady() ? workerTeams() : legacy.listTeams(); },
       getPlaces:function(sheetName){ return workerReady() ? workerPlaces(sheetName) : legacy.getPlaces(sheetName); },
