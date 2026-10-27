@@ -217,7 +217,7 @@ function onTrackedSheetEdit_(e){
           value=(yes?'1':'0')+'|'+date;
         }else{
           const col=columns.find(x=>x[0]===field)[1];
-          value=str_(sh.getRange(row,col).getValue());
+          value=field==='location' ? canonicalLocationRaw_(sh.getRange(row,col).getValue()) : str_(sh.getRange(row,col).getValue());
         }
         recordFieldTime_(sh.getName(),id,field,digestKey_(value),at);
         tracked++;
@@ -300,7 +300,7 @@ function getPlaces_(sheetName) {
       notedVersion: digestKey_(cNoted ? str_(row[cNoted-1]) : ''),
       route: cRoute ? str_(row[cRoute-1]) : '',
       routeVersion: digestKey_(cRoute ? str_(row[cRoute-1]) : ''),
-      locationVersion: digestKey_(str_(row[cLoc-1])),
+      locationVersion: digestKey_(canonicalLocationRaw_(row[cLoc-1])),
       visited,
       lastVisitedDate: cLast ? ymd_(row[cLast-1]) : '',
       visitVersion: digestKey_((visited ? 1 : 0) + '|' + (cLast ? ymd_(row[cLast-1]) : '')),
@@ -363,7 +363,7 @@ function setField_(sheetName,id,aliases,value,field,baseVersion) {
   const s = sheet_(sheetName), m = headerMap_(s);
   const row = rowById_(s,must_(m,['list','id']),id);
   const col = must_(m,aliases);
-  const oldValue = str_(s.getRange(row,col).getValue());
+  const oldValue = field === 'location' ? canonicalLocationRaw_(s.getRange(row,col).getValue()) : str_(s.getRange(row,col).getValue());
   const currentVersion = digestKey_(oldValue);
   const targetValue = str_(value);
   const targetVersion = digestKey_(targetValue);
@@ -483,7 +483,7 @@ function freshStoresForSnapshot_(sheet) {
     return {
       id:id,
       name:name,
-      locationRaw:str_(row[cLoc-1]),
+      locationRaw:canonicalLocationRaw_(row[cLoc-1]),
       mapsUrl:cMaps ? str_(row[cMaps-1]) : '',
       visited:cVisited ? visited_(row[cVisited-1]) : false,
       account:cAccount ? str_(row[cAccount-1]) : '',
@@ -615,6 +615,8 @@ function putChunkedCache_(cache, cacheKey, value, ttlSec) {
 
 function digestKey_(v) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(v),Utilities.Charset.UTF_8)).replace(/=+$/g,'').slice(0,32); }
 function parseLatLng_(v) { const m=str_(v).match(/-?\d+(?:\.\d+)?/g); if(!m||m.length<2)return null; const lat=Number(m[0]),lng=Number(m[1]); return isFinite(lat)&&isFinite(lng)?{lat,lng}:null; }
+// Keep legacy (lat,lng) serialization stable across the bridge migration.
+function canonicalLocationRaw_(v) { const point=parseLatLng_(v); return point ? point.lat+','+point.lng : ''; }
 function visited_(v) { if(v===true)return true; const s=str_(v).toLowerCase(); return ['1','true','yes','y','done','visited'].indexOf(s)!==-1; }
 function ymd_(v) { if(Object.prototype.toString.call(v)==='[object Date]'&&!isNaN(v)) return Utilities.formatDate(v,BRIDGE.TIMEZONE,'yyyy-MM-dd'); const s=str_(v); return s ? s.slice(0,10) : ''; }
 function parseJson_(v) { if(v && typeof v==='object')return v; try{return JSON.parse(String(v||'{}'));}catch(_){return{};} }
