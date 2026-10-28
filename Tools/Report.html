@@ -364,7 +364,7 @@
       margin:0;
     }
     /* Three UI states: checkbox only, checkbox >, checkbox number <. Arrow stays right-anchored. */
-    /* Shared 35px capsule: unchecked checkbox and checked checkbox+chevron use the same width. */
+    /* Shared 35px capsule: one wrapper, with 80/20 checkbox/SVG-chevron input areas. */
     .skuOrderChoice{
       width:35px;
       min-height:34px;
@@ -383,12 +383,14 @@
     .skuOrderChoice.is-order-selected.is-order-expanded{ width:119px; gap:2px; }
     .skuOrderChoice[hidden], .skuOrderQtyWrap[hidden], .skuOrderInput[hidden],
     .skuOrderExpand[hidden]{ display:none !important; }
+    /* The 35px capsule contains two click targets:
+       checkbox 80% (26.4px), SVG chevron 20% (6.6px) of its 33px inner width. */
     .skuOrderCheckWrap{
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      flex:0 0 18px;
-      width:18px;
+      flex:0 0 26.4px;
+      width:26.4px;
       height:32px;
       padding:0;
       border:0;
@@ -412,19 +414,34 @@
       height:19px;
     }
     .skuOrderExpand{
-      width:15px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:6.6px;
       height:32px;
-      flex:0 0 15px;
+      flex:0 0 6.6px;
       padding:0;
       border:0;
       border-radius:0 7px 7px 0;
       background:transparent;
       color:#047857;
-      font-size:14px;
-      line-height:1;
-      font-weight:850;
       cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
     }
+    .skuOrderChevron{
+      display:block;
+      width:6px;
+      height:12px;
+      overflow:visible;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.35;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      pointer-events:none;
+      transition:transform 160ms ease;
+    }
+    .skuOrderChoice.is-order-expanded .skuOrderChevron{ transform:rotate(180deg); }
     .skuOrderExpand:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
     .skuOrderExpand:disabled{ color:#94a3b8; cursor:not-allowed; }
     .skuOrderQtyWrap{
@@ -1915,7 +1932,11 @@
           <button class="skuOrderAdjust" type="button" data-role="order-plus" aria-label="เพิ่มจำนวนฝากสั่ง 1 ชิ้น">+</button>
         </span>
         <button class="skuOrderExpand" type="button" data-role="order-expand"
-          aria-label="เปิดช่องจำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" aria-expanded="false" hidden>&gt;</button>
+          aria-label="เปิดช่องจำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" aria-expanded="false" hidden>
+          <svg class="skuOrderChevron" viewBox="0 0 8 12" aria-hidden="true" focusable="false">
+            <path d="M2.25 1.5 5.75 6 2.25 10.5"></path>
+          </svg>
+        </button>
       </div>
     `;
     return row;
@@ -2024,7 +2045,6 @@
     if (expander){
       expander.hidden = !checked;
       expander.disabled = blocked;
-      expander.textContent = expanded ? "<" : ">";
       expander.setAttribute("aria-expanded", String(expanded));
       expander.setAttribute("aria-label", expanded
         ? "ปิดช่องจำนวนฝากสั่ง"

@@ -44,8 +44,13 @@ assert.match(html,/data-role="order-minus"/);
 assert.match(html,/data-role="order-plus"/);
 assert.match(html,/changeOrderStep/);
 assert.match(html,/\.skuOrderExpand\{/);
-assert.match(html,/width:15px/);
+assert.match(html,/width:6\.6px/);
+assert.match(html,/flex:0 0 26\.4px/);
 assert.match(html,/skuOrderChoice\.is-order-selected\{ width:35px; \}/);
+assert.match(html,/<svg class="skuOrderChevron" viewBox="0 0 8 12"/);
+assert.match(html,/<path d="M2\.25 1\.5 5\.75 6 2\.25 10\.5"/);
+assert.match(html,/skuOrderChoice\.is-order-expanded \.skuOrderChevron/);
+assert.doesNotMatch(html,/expander\.textContent\s*=/,'no font-based arrow substitution');
 assert.match(html,/skuOrderChoice\.is-order-selected\.is-order-expanded\{ width:119px/);
 assert.match(html,/skuOrderChoice:not\(\.is-order-selected\) \.skuOrderCheckWrap/);
 
