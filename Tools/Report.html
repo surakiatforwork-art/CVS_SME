@@ -363,43 +363,78 @@
       accent-color:var(--accent);
       margin:0;
     }
+    /* Each control has its own wrapper; the ordering checkbox stays right-aligned. */
     .skuOrderChoice{
-      width:78px;
-      min-height:38px;
+      width:35px;
+      min-height:34px;
       display:inline-flex;
       align-items:center;
-      justify-content:flex-start;
-      gap:5px;
-      padding:3px 5px;
-      border:1px solid rgba(16,185,129,.20);
-      border-radius:12px;
-      background:rgba(16,185,129,.06);
+      justify-content:flex-end;
+      gap:4px;
+      padding:0;
+      border:0;
+      background:transparent;
       justify-self:end;
+      transition:width 160ms ease;
     }
-    .skuOrderChoice[hidden], .skuOrderInput[hidden]{ display:none !important; }
-    .skuOrderCheck{ width:19px; height:19px; flex:0 0 19px; accent-color:var(--accent); margin:0; cursor:pointer; }
+    .skuOrderChoice.is-order-selected{ width:79px; }
+    .skuOrderChoice[hidden], .skuOrderQtyWrap[hidden], .skuOrderInput[hidden]{ display:none !important; }
+    .skuOrderCheckWrap{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 35px;
+      width:35px;
+      height:34px;
+      padding:0;
+      border-radius:8px;
+      border:1px solid rgba(16,185,129,.20);
+      background:rgba(16,185,129,.06);
+      cursor:pointer;
+    }
+    .skuOrderCheck{
+      width:19px;
+      height:19px;
+      accent-color:var(--accent);
+      margin:0;
+      cursor:pointer;
+    }
+    .skuOrderQtyWrap{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 40px;
+      width:40px;
+      height:34px;
+      border-radius:8px;
+      border:1px solid rgba(16,185,129,.35);
+      background:#fff;
+    }
+    .skuOrderQtyWrap:focus-within{ outline:2px solid rgba(16,185,129,.40); outline-offset:0; }
     .skuOrderInput{
-      width:39px;
+      width:100%;
       min-width:0;
       height:32px;
       padding:0 2px;
+      border:0;
       border-radius:7px;
-      border:1px solid rgba(16,185,129,.35);
-      background:#fff;
+      outline:none;
+      background:transparent;
       font-size:16px;
       font-weight:800;
       text-align:center;
       color:#065f46;
     }
-    .skuOrderInput:focus{ outline:2px solid rgba(16,185,129,.40); outline-offset:0; }
     .skuOrderInput::-webkit-inner-spin-button,
     .skuOrderInput::-webkit-outer-spin-button{ -webkit-appearance:none; margin:0; }
     .skuOrderInput{ appearance:textfield; -moz-appearance:textfield; }
-    .skuRow.sku-order-low .skuOrderInput{ border-color:#d97706; color:#92400e; }
+    .skuRow.sku-order-low .skuOrderQtyWrap{ border-color:#d97706; }
+    .skuRow.sku-order-low .skuOrderInput{ color:#92400e; }
+    @media (prefers-reduced-motion:reduce){ .skuOrderChoice{ transition:none; } }
     /* Dense paper-slip layout applies only to 7-ELEVEN, not other accounts. */
     .skuBoard.skuCompact .skuList{ gap:0; padding:0; border:1px solid rgba(2,6,23,.12); border-radius:9px; overflow:hidden; }
     .skuBoard.skuCompact .skuRow{
-      grid-template-columns:44px minmax(0,1fr) 31px 78px;
+      grid-template-columns:44px minmax(0,1fr) 31px max-content;
       gap:4px;
       min-height:43px;
       padding:3px 4px;
@@ -414,7 +449,7 @@
     .skuBoard.skuCompact .skuTitle{ font-size:13px; line-height:1.27; }
     .skuBoard.skuCompact .skuFlag{ width:44px; min-height:33px; padding-block:5px; font-size:13px; }
     .skuBoard.skuCompact .skuCheckWrap{ min-height:34px; border-radius:8px; padding:0 4px; }
-    .skuBoard.skuCompact .skuOrderChoice{ min-height:34px; padding-block:0; }
+    .skuBoard.skuCompact .skuOrderChoice{ min-height:34px; }
     @media (max-width:520px){
       .skuList{ padding:6px; }
       .skuRow{ grid-template-columns:44px minmax(0, 1fr) auto auto; gap:4px; padding:8px 6px; }
@@ -431,8 +466,8 @@
       .skuTitle{ font-size:13px; line-height:1.4; }
       .skuCheckWrap{ min-height:40px; padding:0 5px; }
       .skuCheckWrap input{ width:19px; height:19px; }
-      .skuOrderChoice{ width:78px; }
-      .skuBoard.skuCompact .skuRow{ grid-template-columns:44px minmax(0,1fr) 31px 78px; }
+      .skuOrderChoice{ min-height:34px; }
+      .skuBoard.skuCompact .skuRow{ grid-template-columns:44px minmax(0,1fr) 31px max-content; }
       .skuBoard.skuCompact .skuTitle{ font-size:13px; line-height:1.27; }
     }
     .skuRow.sku-disabled{
@@ -1824,9 +1859,13 @@
         <input type="checkbox" class="skuCheck" data-role="check" aria-label="มีสินค้า ${escapeHtmlAttr(item.label)}">
       </label>
       <div class="skuOrderChoice" data-role="order-step" hidden>
-        <input class="skuOrderCheck" type="checkbox" data-role="order-check" aria-label="ฝากสั่ง ${escapeHtmlAttr(item.label)}">
-        <input class="skuOrderInput" type="number" inputmode="numeric" min="1" max="9999" step="1"
-          data-role="order-input" aria-label="จำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" hidden>
+        <span class="skuOrderQtyWrap" data-role="order-quantity" hidden>
+          <input class="skuOrderInput" type="number" inputmode="numeric" min="1" max="9999" step="1"
+            data-role="order-input" aria-label="จำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" hidden>
+        </span>
+        <label class="skuOrderCheckWrap">
+          <input class="skuOrderCheck" type="checkbox" data-role="order-check" aria-label="ฝากสั่ง ${escapeHtmlAttr(item.label)}">
+        </label>
       </div>
     `;
     return row;
@@ -1922,6 +1961,10 @@
     row.dataset.orderQuantity = String(quantity);
     const checkbox = row.querySelector('[data-role="order-check"]');
     const input = row.querySelector('[data-role="order-input"]');
+    const orderChoice = row.querySelector('[data-role="order-step"]');
+    const qtyWrap = row.querySelector('[data-role="order-quantity"]');
+    if (orderChoice) orderChoice.classList.toggle("is-order-selected", checked);
+    if (qtyWrap) qtyWrap.hidden = !checked;
     if (checkbox){ checkbox.checked = checked; checkbox.disabled = blocked; checkbox.title = orderMeta.matched || orderMeta.configured
       ? "ฝากสั่งขั้นต่ำ " + min + " ชิ้น" : "PK ยังไม่ยืนยันในใบฝากสั่ง ใช้ขั้นต่ำ 3 ชิ้นชั่วคราว"; }
     if (input){

@@ -24,6 +24,14 @@ assert.match(html,/data-role="order-check"/);
 assert.match(html,/data-role="order-input"/);
 assert.match(html,/skuCompact/);
 assert.match(html,/changeOrderInput/);
+assert.match(html,/data-role="order-quantity" hidden/);
+assert.match(html,/class="skuOrderCheckWrap"/);
+assert.match(html,/class="skuOrderQtyWrap"/);
+assert.match(html,/is-order-selected/);
+assert.match(html,/31px max-content/);
+assert.ok(html.indexOf('data-role="order-quantity" hidden') < html.indexOf('data-role="order-check"'),
+  'order quantity appears before the rightmost order checkbox');
+
 assert.match(html,/function renderSkuLists\(\)/);
 assert.match(html,/for \(const item of SKU_ITEMS\)/);
 assert.doesNotMatch(html,/ordered\.sort\(/, 'must not override ReportAdmin SKU order');
