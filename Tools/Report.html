@@ -363,7 +363,7 @@
       accent-color:var(--accent);
       margin:0;
     }
-    /* Each control has its own wrapper; the ordering checkbox stays right-aligned. */
+    /* Three UI states: checkbox only, checkbox >, checkbox number <. Arrow stays right-anchored. */
     .skuOrderChoice{
       width:35px;
       min-height:34px;
@@ -377,8 +377,11 @@
       justify-self:end;
       transition:width 160ms ease;
     }
-    .skuOrderChoice.is-order-selected{ width:79px; }
-    .skuOrderChoice[hidden], .skuOrderQtyWrap[hidden], .skuOrderInput[hidden]{ display:none !important; }
+    /* Unticked: checkbox. Ticked: checkbox + chevron. Expanded: checkbox + number + chevron. */
+    .skuOrderChoice.is-order-selected{ width:69px; }
+    .skuOrderChoice.is-order-selected.is-order-expanded{ width:113px; }
+    .skuOrderChoice[hidden], .skuOrderQtyWrap[hidden], .skuOrderInput[hidden],
+    .skuOrderExpand[hidden]{ display:none !important; }
     .skuOrderCheckWrap{
       display:inline-flex;
       align-items:center;
@@ -399,6 +402,22 @@
       margin:0;
       cursor:pointer;
     }
+    .skuOrderExpand{
+      width:30px;
+      height:34px;
+      flex:0 0 30px;
+      padding:0;
+      border:1px solid rgba(16,185,129,.20);
+      border-radius:8px;
+      background:rgba(16,185,129,.06);
+      color:#047857;
+      font-size:19px;
+      line-height:1;
+      font-weight:850;
+      cursor:pointer;
+    }
+    .skuOrderExpand:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+    .skuOrderExpand:disabled{ color:#94a3b8; cursor:not-allowed; }
     .skuOrderQtyWrap{
       display:inline-flex;
       align-items:center;
@@ -1859,13 +1878,15 @@
         <input type="checkbox" class="skuCheck" data-role="check" aria-label="มีสินค้า ${escapeHtmlAttr(item.label)}">
       </label>
       <div class="skuOrderChoice" data-role="order-step" hidden>
+        <label class="skuOrderCheckWrap">
+          <input class="skuOrderCheck" type="checkbox" data-role="order-check" aria-label="ฝากสั่ง ${escapeHtmlAttr(item.label)}">
+        </label>
         <span class="skuOrderQtyWrap" data-role="order-quantity" hidden>
           <input class="skuOrderInput" type="number" inputmode="numeric" min="1" max="9999" step="1"
             data-role="order-input" aria-label="จำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" hidden>
         </span>
-        <label class="skuOrderCheckWrap">
-          <input class="skuOrderCheck" type="checkbox" data-role="order-check" aria-label="ฝากสั่ง ${escapeHtmlAttr(item.label)}">
-        </label>
+        <button class="skuOrderExpand" type="button" data-role="order-expand"
+          aria-label="เปิดช่องจำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" aria-expanded="false" hidden>&gt;</button>
       </div>
     `;
     return row;
@@ -1963,13 +1984,29 @@
     const input = row.querySelector('[data-role="order-input"]');
     const orderChoice = row.querySelector('[data-role="order-step"]');
     const qtyWrap = row.querySelector('[data-role="order-quantity"]');
-    if (orderChoice) orderChoice.classList.toggle("is-order-selected", checked);
-    if (qtyWrap) qtyWrap.hidden = !checked;
+    const expander = row.querySelector('[data-role="order-expand"]');
+    // Expansion is presentational only: quantity always remains in orderQuantities.
+    const expanded = checked && !!orderChoice?.classList.contains("is-order-expanded");
+    if (orderChoice){
+      orderChoice.classList.toggle("is-order-selected", checked);
+      orderChoice.classList.toggle("is-order-expanded", expanded);
+    }
+    if (qtyWrap) qtyWrap.hidden = !expanded;
+    if (expander){
+      expander.hidden = !checked;
+      expander.disabled = blocked;
+      expander.textContent = expanded ? "<" : ">";
+      expander.setAttribute("aria-expanded", String(expanded));
+      expander.setAttribute("aria-label", expanded
+        ? "ปิดช่องจำนวนฝากสั่ง"
+        : "เปิดช่องจำนวนฝากสั่ง " + quantity + " ชิ้น");
+      expander.title = expanded ? "ซ่อนช่องแก้ไขจำนวน" : "จำนวนปัจจุบัน " + quantity + " ชิ้น · แตะเพื่อแก้ไข";
+    }
     if (checkbox){ checkbox.checked = checked; checkbox.disabled = blocked; checkbox.title = orderMeta.matched || orderMeta.configured
       ? "ฝากสั่งขั้นต่ำ " + min + " ชิ้น" : "PK ยังไม่ยืนยันในใบฝากสั่ง ใช้ขั้นต่ำ 3 ชิ้นชั่วคราว"; }
     if (input){
-      input.hidden = !checked;
-      input.disabled = blocked || !checked;
+      input.hidden = !expanded;
+      input.disabled = blocked || !expanded;
       input.min = String(min);
       input.value = checked ? String(quantity) : "";
       input.title = quantity && quantity < min
@@ -2879,6 +2916,17 @@
     updatePreview();
   }
 
+  function toggleOrderQuantityDetails(target){
+    const row = target.closest(".skuRow");
+    if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
+    if (getRowFlag(row) === MONTHLY_FLAG_SKIP) return;
+    if (!row.querySelector('[data-role="order-check"]')?.checked) return;
+    const wrapper = row.querySelector('[data-role="order-step"]');
+    wrapper?.classList.toggle("is-order-expanded");
+    setOrderQuantityForRow(row, row.dataset.orderQuantity);
+    // Do not save the open/closed state; only the order quantity is persistent.
+  }
+
   function changeOrderInput(target){
     const row = target.closest(".skuRow");
     if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
@@ -2925,7 +2973,12 @@
     if (!target.matches('[data-role="flag"], [data-role="check"]')) return;
     handleSkuControlChange(target);
   });
-  // The order quantity is an editable numeric input; no stepper clicks needed.
+  skuBoard.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.matches('[data-role="order-expand"]')){
+      toggleOrderQuantityDetails(target);
+    }
+  });
 
   btnCopy.addEventListener("click", () => doCopy({ openLine: true }));
   btnCopyOnly.addEventListener("click", () => doCopy({ openLine: false }));

@@ -29,8 +29,13 @@ assert.match(html,/class="skuOrderCheckWrap"/);
 assert.match(html,/class="skuOrderQtyWrap"/);
 assert.match(html,/is-order-selected/);
 assert.match(html,/31px max-content/);
-assert.ok(html.indexOf('data-role="order-quantity" hidden') < html.indexOf('data-role="order-check"'),
-  'order quantity appears before the rightmost order checkbox');
+assert.ok(html.indexOf('data-role="order-check"') < html.indexOf('data-role="order-quantity" hidden'),
+  'ordering checkbox appears before quantity in the closed/open slide layout');
+assert.ok(html.indexOf('data-role="order-quantity" hidden') < html.indexOf('data-role="order-expand"'),
+  'quantity slides between ordering checkbox and chevron');
+assert.match(html,/class="skuOrderExpand"/);
+assert.match(html,/is-order-expanded/);
+assert.match(html,/toggleOrderQuantityDetails/);
 
 assert.match(html,/function renderSkuLists\(\)/);
 assert.match(html,/for \(const item of SKU_ITEMS\)/);
