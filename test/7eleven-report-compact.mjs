@@ -44,8 +44,12 @@ assert.match(html,/data-role="order-minus"/);
 assert.match(html,/data-role="order-plus"/);
 assert.match(html,/changeOrderStep/);
 assert.match(html,/\.skuOrderExpand\{/);
-assert.match(html,/width:23px/);
-assert.match(html,/height:34px/);
+assert.match(html,/width:15px/);
+assert.match(html,/skuOrderChoice\.is-order-selected\{ width:35px; \}/);
+assert.match(html,/skuOrderChoice\.is-order-selected\.is-order-expanded\{ width:119px/);
+assert.match(html,/skuOrderChoice:not\(\.is-order-selected\) \.skuOrderCheckWrap/);
+
+assert.match(html,/height:32px/);
 assert.match(admin,/id="pk"/);
 assert.match(admin,/id="barcode"/);
 assert.match(map,/Number.isSafeInteger\(quantity\)/);

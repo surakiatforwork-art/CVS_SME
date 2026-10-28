@@ -364,54 +364,63 @@
       margin:0;
     }
     /* Three UI states: checkbox only, checkbox >, checkbox number <. Arrow stays right-anchored. */
+    /* Shared 35px capsule: unchecked checkbox and checked checkbox+chevron use the same width. */
     .skuOrderChoice{
       width:35px;
       min-height:34px;
       display:inline-flex;
       align-items:center;
       justify-content:flex-end;
-      gap:4px;
+      gap:0;
       padding:0;
-      border:0;
-      background:transparent;
+      border:1px solid rgba(16,185,129,.20);
+      border-radius:8px;
+      background:rgba(16,185,129,.06);
       justify-self:end;
       transition:width 160ms ease;
     }
-    /* Unticked: checkbox. Ticked: checkbox + chevron. Expanded: checkbox + number + chevron. */
-    .skuOrderChoice.is-order-selected{ width:62px; }
-    .skuOrderChoice.is-order-selected.is-order-expanded{ width:146px; }
+    .skuOrderChoice.is-order-selected{ width:35px; }
+    .skuOrderChoice.is-order-selected.is-order-expanded{ width:119px; gap:2px; }
     .skuOrderChoice[hidden], .skuOrderQtyWrap[hidden], .skuOrderInput[hidden],
     .skuOrderExpand[hidden]{ display:none !important; }
     .skuOrderCheckWrap{
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      flex:0 0 35px;
-      width:35px;
-      height:34px;
+      flex:0 0 18px;
+      width:18px;
+      height:32px;
       padding:0;
-      border-radius:8px;
-      border:1px solid rgba(16,185,129,.20);
-      background:rgba(16,185,129,.06);
+      border:0;
+      border-radius:7px;
+      background:transparent;
       cursor:pointer;
     }
+    .skuOrderChoice:not(.is-order-selected) .skuOrderCheckWrap{
+      flex-basis:33px;
+      width:33px;
+    }
     .skuOrderCheck{
-      width:19px;
-      height:19px;
+      width:17px;
+      height:17px;
       accent-color:var(--accent);
       margin:0;
       cursor:pointer;
     }
+    .skuOrderChoice:not(.is-order-selected) .skuOrderCheck{
+      width:19px;
+      height:19px;
+    }
     .skuOrderExpand{
-      width:23px; /* 75% of original 30px, rounded for pixel-safe taps */
-      height:34px;
-      flex:0 0 23px;
+      width:15px;
+      height:32px;
+      flex:0 0 15px;
       padding:0;
-      border:1px solid rgba(16,185,129,.20);
-      border-radius:8px;
-      background:rgba(16,185,129,.06);
+      border:0;
+      border-radius:0 7px 7px 0;
+      background:transparent;
       color:#047857;
-      font-size:19px;
+      font-size:14px;
       line-height:1;
       font-weight:850;
       cursor:pointer;
