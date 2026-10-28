@@ -3516,8 +3516,8 @@
     if(!raw || typeof raw !== 'object') return out;
     Object.keys(raw).forEach(function(id){
       var quantity = Number(raw[id]);
-      // The report control only permits order packs of three, up to twelve.
-      if([3,6,9,12].indexOf(quantity) !== -1) out[String(id)] = quantity;
+      // Each 7-ELEVEN SKU now uses an editable quantity with its own PK minimum.
+      if(Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 9999) out[String(id)] = quantity;
     });
     return out;
   }

@@ -363,35 +363,58 @@
       accent-color:var(--accent);
       margin:0;
     }
-    .skuOrderStep{
+    .skuOrderChoice{
+      width:78px;
+      min-height:38px;
       display:inline-flex;
       align-items:center;
-      gap:2px;
-      min-width:96px;
-      padding:3px;
+      justify-content:flex-start;
+      gap:5px;
+      padding:3px 5px;
       border:1px solid rgba(16,185,129,.20);
-      border-radius:999px;
+      border-radius:12px;
       background:rgba(16,185,129,.06);
+      justify-self:end;
     }
-    .skuOrderStep[hidden]{ display:none; }
-    .skuOrderButton{
-      width:26px;
-      height:26px;
-      border:0;
-      border-radius:999px;
-      background:transparent;
-      color:#047857;
-      font:900 18px/1 inherit;
-      cursor:pointer;
-    }
-    .skuOrderButton:disabled{ color:#94a3b8; cursor:not-allowed; }
-    .skuOrderValue{
-      min-width:28px;
-      color:#0f766e;
-      font-size:13px;
-      font-weight:950;
+    .skuOrderChoice[hidden], .skuOrderInput[hidden]{ display:none !important; }
+    .skuOrderCheck{ width:19px; height:19px; flex:0 0 19px; accent-color:var(--accent); margin:0; cursor:pointer; }
+    .skuOrderInput{
+      width:39px;
+      min-width:0;
+      height:32px;
+      padding:0 2px;
+      border-radius:7px;
+      border:1px solid rgba(16,185,129,.35);
+      background:#fff;
+      font-size:16px;
+      font-weight:800;
       text-align:center;
+      color:#065f46;
     }
+    .skuOrderInput:focus{ outline:2px solid rgba(16,185,129,.40); outline-offset:0; }
+    .skuOrderInput::-webkit-inner-spin-button,
+    .skuOrderInput::-webkit-outer-spin-button{ -webkit-appearance:none; margin:0; }
+    .skuOrderInput{ appearance:textfield; -moz-appearance:textfield; }
+    .skuRow.sku-order-low .skuOrderInput{ border-color:#d97706; color:#92400e; }
+    /* Dense paper-slip layout applies only to 7-ELEVEN, not other accounts. */
+    .skuBoard.skuCompact .skuList{ gap:0; padding:0; border:1px solid rgba(2,6,23,.12); border-radius:9px; overflow:hidden; }
+    .skuBoard.skuCompact .skuRow{
+      grid-template-columns:44px minmax(0,1fr) 31px 78px;
+      gap:4px;
+      min-height:43px;
+      padding:3px 4px;
+      border:0;
+      border-bottom:1px solid rgba(2,6,23,.11);
+      border-radius:0;
+      background:#fff;
+    }
+    .skuBoard.skuCompact .skuRow:last-child{ border-bottom:0; }
+    .skuBoard.skuCompact .skuRow:nth-child(even){ background:#f7fcfa; }
+    .skuBoard.skuCompact .skuRow.sku-disabled{ background:rgba(239,68,68,.05); }
+    .skuBoard.skuCompact .skuTitle{ font-size:13px; line-height:1.27; }
+    .skuBoard.skuCompact .skuFlag{ width:44px; min-height:33px; padding-block:5px; font-size:13px; }
+    .skuBoard.skuCompact .skuCheckWrap{ min-height:34px; border-radius:8px; padding:0 4px; }
+    .skuBoard.skuCompact .skuOrderChoice{ min-height:34px; padding-block:0; }
     @media (max-width:520px){
       .skuList{ padding:6px; }
       .skuRow{ grid-template-columns:44px minmax(0, 1fr) auto auto; gap:4px; padding:8px 6px; }
@@ -408,9 +431,9 @@
       .skuTitle{ font-size:13px; line-height:1.4; }
       .skuCheckWrap{ min-height:40px; padding:0 5px; }
       .skuCheckWrap input{ width:19px; height:19px; }
-      .skuOrderStep{ min-width:0; gap:0; padding:0; }
-      .skuOrderButton{ width:24px; height:40px; padding:0; font-size:17px; }
-      .skuOrderValue{ min-width:18px; font-size:12px; }
+      .skuOrderChoice{ width:78px; }
+      .skuBoard.skuCompact .skuRow{ grid-template-columns:44px minmax(0,1fr) 31px 78px; }
+      .skuBoard.skuCompact .skuTitle{ font-size:13px; line-height:1.27; }
     }
     .skuRow.sku-disabled{
       background:rgba(239,68,68,.05);
@@ -751,6 +774,7 @@
 
 <script src="worker-auth.js"></script>
 <script src="backend-client.js"></script>
+<script src="order-pk.js"></script>
 <script>
 (() => {
   "use strict";
@@ -1288,8 +1312,8 @@
     const out = {};
     if (!raw || typeof raw !== "object") return out;
     for (const [id, value] of Object.entries(raw)){
-      const quantity = Number(value);
-      if ([3, 6, 9, 12].includes(quantity)) out[id] = quantity;
+      const quantity = window.PTOrderPkCatalog.positiveInt(value);
+      if (quantity) out[id] = quantity;
     }
     return out;
   }
@@ -1719,7 +1743,9 @@
     SKU_ITEMS = skuRecords.map((item) => ({
       id: String(item.id), label: String((item.data || {}).label || item.id),
       family: (item.data || {}).family === "DEN" ? "DEN" : "SME", accounts: [accountName],
-      category: String((item.data || {}).category || "📍สินค้าอื่นๆ"), sort: Number((item.data || {}).formSort) || Number(item.sort) || 0
+      category: String((item.data || {}).category || "📍สินค้าอื่นๆ"), sort: Number((item.data || {}).formSort) || Number(item.sort) || 0,
+      pk: window.PTOrderPkCatalog.resolve(item.id, item.data).pk,
+      barcode: window.PTOrderPkCatalog.resolve(item.id, item.data).barcode
     }));
     SUMMARY_TOPICS = active.filter((item) => item.kind === "summary").sort((a, b) => a.sort - b.sort)
       .map((item) => ({ id: String(item.id), label: String((item.data || {}).label || item.id) }));
@@ -1797,10 +1823,10 @@
       <label class="skuCheckWrap">
         <input type="checkbox" class="skuCheck" data-role="check" aria-label="มีสินค้า ${escapeHtmlAttr(item.label)}">
       </label>
-      <div class="skuOrderStep" data-role="order-step" hidden aria-label="จำนวนสั่งเพิ่ม ${escapeHtmlAttr(item.label)}">
-        <button type="button" class="skuOrderButton" data-role="order-minus" aria-label="ลดจำนวนสั่ง ${escapeHtmlAttr(item.label)}">−</button>
-        <output class="skuOrderValue" data-role="order-value">0</output>
-        <button type="button" class="skuOrderButton" data-role="order-plus" aria-label="เพิ่มจำนวนสั่ง ${escapeHtmlAttr(item.label)}">+</button>
+      <div class="skuOrderChoice" data-role="order-step" hidden>
+        <input class="skuOrderCheck" type="checkbox" data-role="order-check" aria-label="ฝากสั่ง ${escapeHtmlAttr(item.label)}">
+        <input class="skuOrderInput" type="number" inputmode="numeric" min="1" max="9999" step="1"
+          data-role="order-input" aria-label="จำนวนฝากสั่ง ${escapeHtmlAttr(item.label)}" hidden>
       </div>
     `;
     return row;
@@ -1809,7 +1835,20 @@
   function renderSkuLists(){
     skuListAll.innerHTML = "";
 
-    for (const item of SKU_ITEMS){
+    // Align the 7-ELEVEN checklist with the paper order slip.
+    // Additional SKUs that are not on this slip retain their configured relative order.
+    const ordered = [...SKU_ITEMS];
+    if (safeText(account.value).trim().toUpperCase() === "7-ELEVEN"){
+      ordered.sort((a, b) => {
+        const aa = window.PTOrderPkCatalog.resolve(a.id).slipIndex;
+        const bb = window.PTOrderPkCatalog.resolve(b.id).slipIndex;
+        if (aa === null && bb === null) return 0;
+        if (aa === null) return 1;
+        if (bb === null) return -1;
+        return aa - bb;
+      });
+    }
+    for (const item of ordered){
       skuListAll.appendChild(createSkuRow(item));
     }
   }
@@ -1829,6 +1868,9 @@
 
   function updateSkuVisibility(){
     const supportsOrders = safeText(account.value).trim().toUpperCase() === "7-ELEVEN";
+    skuBoard.classList.toggle("skuCompact", supportsOrders);
+    const heading = skuBoard.querySelector(".skuSectionHead strong");
+    if (heading) heading.textContent = supportsOrders ? "รายการสินค้า (ตามใบฝากสั่ง)" : "รายการสินค้า (ตามลิสต์หลัก)";
     for (const item of SKU_ITEMS){
       const row = getSkuRow(item.id);
       if (!row) continue;
@@ -1877,16 +1919,33 @@
     }
   }
 
+  function getRowPk(row){
+    const sku = SKU_ITEM_MAP.get(row.dataset.skuId || "");
+    return window.PTOrderPkCatalog.resolve(row.dataset.skuId, sku).pk;
+  }
+
   function setOrderQuantityForRow(row, value){
     if (!row) return;
-    const quantity = [3, 6, 9, 12].includes(Number(value)) ? Number(value) : 0;
+    const quantity = window.PTOrderPkCatalog.positiveInt(value);
+    const checked = quantity > 0;
+    const blocked = getRowFlag(row) === MONTHLY_FLAG_SKIP;
+    const orderMeta = window.PTOrderPkCatalog.resolve(row.dataset.skuId, SKU_ITEM_MAP.get(row.dataset.skuId));
+    const min = orderMeta.pk;
     row.dataset.orderQuantity = String(quantity);
-    const output = row.querySelector('[data-role="order-value"]');
-    if (output) output.textContent = String(quantity);
-    const minus = row.querySelector('[data-role="order-minus"]');
-    const plus = row.querySelector('[data-role="order-plus"]');
-    if (minus) minus.disabled = quantity <= 0 || getRowFlag(row) === MONTHLY_FLAG_SKIP;
-    if (plus) plus.disabled = quantity >= 12 || getRowFlag(row) === MONTHLY_FLAG_SKIP;
+    const checkbox = row.querySelector('[data-role="order-check"]');
+    const input = row.querySelector('[data-role="order-input"]');
+    if (checkbox){ checkbox.checked = checked; checkbox.disabled = blocked; checkbox.title = orderMeta.matched || orderMeta.configured
+      ? "ฝากสั่งขั้นต่ำ " + min + " ชิ้น" : "PK ยังไม่ยืนยันในใบฝากสั่ง ใช้ขั้นต่ำ 3 ชิ้นชั่วคราว"; }
+    if (input){
+      input.hidden = !checked;
+      input.disabled = blocked || !checked;
+      input.min = String(min);
+      input.value = checked ? String(quantity) : "";
+      input.title = quantity && quantity < min
+        ? "จำนวนเก่า " + quantity + " ต่ำกว่า PK ใหม่ " + min + " ชิ้น (แก้ไขก่อนสั่งครั้งถัดไป)"
+        : "ขั้นต่ำ " + min + " ชิ้น (แก้จำนวนได้)";
+    }
+    row.classList.toggle("sku-order-low", checked && quantity < min);
   }
 
   function clearOrderQuantities(){
@@ -1909,7 +1968,7 @@
     for (const row of getSkuRows()){
       if (row.hidden || getRowFlag(row) === MONTHLY_FLAG_SKIP) continue;
       const quantity = Number(row.dataset.orderQuantity || 0);
-      if ([3, 6, 9, 12].includes(quantity)) out[row.dataset.skuId] = quantity;
+      if (window.PTOrderPkCatalog.positiveInt(quantity)) out[row.dataset.skuId] = quantity;
     }
     return out;
   }
@@ -2779,14 +2838,30 @@
     updatePreview();
   }
 
-  function changeOrderQuantity(target){
+  function changeOrderSelection(target){
     const row = target.closest(".skuRow");
     if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
     if (getRowFlag(row) === MONTHLY_FLAG_SKIP) return;
-    const direction = target.matches('[data-role="order-plus"]') ? 1 : -1;
-    const current = Number(row.dataset.orderQuantity || 0);
-    const next = Math.max(0, Math.min(12, current + (direction * 3)));
-    setOrderQuantityForRow(row, next);
+    // First selection always starts at this SKU's PK. Do not open the keyboard.
+    setOrderQuantityForRow(row, target.checked ? getRowPk(row) : 0);
+    saveFormState();
+    updatePreview();
+  }
+
+  function changeOrderInput(target){
+    const row = target.closest(".skuRow");
+    if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
+    if (getRowFlag(row) === MONTHLY_FLAG_SKIP) return;
+    const min = getRowPk(row);
+    const requested = window.PTOrderPkCatalog.positiveInt(target.value);
+    if (!requested || requested < min){
+      // Prevent a sub-minimum or malformed new order; keep prior historical values
+      // until the user actually edits the quantity.
+      setOrderQuantityForRow(row, Math.max(min, Number(row.dataset.orderQuantity) || 0));
+      showToast("ฝากสั่งขั้นต่ำ " + min + " ชิ้น");
+      return;
+    }
+    setOrderQuantityForRow(row, requested);
     saveFormState();
     updatePreview();
   }
@@ -2814,15 +2889,12 @@
   skuBoard.addEventListener("change", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    if (target.matches('[data-role="order-check"]')) return changeOrderSelection(target);
+    if (target.matches('[data-role="order-input"]')) return changeOrderInput(target);
     if (!target.matches('[data-role="flag"], [data-role="check"]')) return;
     handleSkuControlChange(target);
   });
-  skuBoard.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (!target.matches('[data-role="order-minus"], [data-role="order-plus"]')) return;
-    changeOrderQuantity(target);
-  });
+  // The order quantity is an editable numeric input; no stepper clicks needed.
 
   btnCopy.addEventListener("click", () => doCopy({ openLine: true }));
   btnCopyOnly.addEventListener("click", () => doCopy({ openLine: false }));
