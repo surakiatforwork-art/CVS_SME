@@ -1835,20 +1835,8 @@
   function renderSkuLists(){
     skuListAll.innerHTML = "";
 
-    // Align the 7-ELEVEN checklist with the paper order slip.
-    // Additional SKUs that are not on this slip retain their configured relative order.
-    const ordered = [...SKU_ITEMS];
-    if (safeText(account.value).trim().toUpperCase() === "7-ELEVEN"){
-      ordered.sort((a, b) => {
-        const aa = window.PTOrderPkCatalog.resolve(a.id).slipIndex;
-        const bb = window.PTOrderPkCatalog.resolve(b.id).slipIndex;
-        if (aa === null && bb === null) return 0;
-        if (aa === null) return 1;
-        if (bb === null) return -1;
-        return aa - bb;
-      });
-    }
-    for (const item of ordered){
+    // Preserve ReportAdmin/formSort order for every account; PK never reorders.
+    for (const item of SKU_ITEMS){
       skuListAll.appendChild(createSkuRow(item));
     }
   }
@@ -1870,7 +1858,7 @@
     const supportsOrders = safeText(account.value).trim().toUpperCase() === "7-ELEVEN";
     skuBoard.classList.toggle("skuCompact", supportsOrders);
     const heading = skuBoard.querySelector(".skuSectionHead strong");
-    if (heading) heading.textContent = supportsOrders ? "รายการสินค้า (ตามใบฝากสั่ง)" : "รายการสินค้า (ตามลิสต์หลัก)";
+    if (heading) heading.textContent = "รายการสินค้า (ตามลิสต์หลัก)";
     for (const item of SKU_ITEMS){
       const row = getSkuRow(item.id);
       if (!row) continue;

@@ -8,10 +8,10 @@
 - Saved positive values are retained when reopening a report. An old value below a subsequently raised PK remains visible with an amber outline, not silently rewritten; editing enforces the latest minimum.
 - `noted.orderQuantities`, Report COPY, LINE, and map persistence keep their original schema. Quantity normalization accepts 1–9999, not only 3/6/9/12.
 - Compact style: zero inter-row gap, subtle separators and alternating backgrounds, 13px name typography, approximately 43px per single-line row at 360px screen width. Name may wrap if needed. The checkbox and conditional input share a fixed-width right column to avoid jumping text.
-- When account is 7-ELEVEN, the 40 mapped SKUs display in source paper-slip order; unmatched legacy products follow in their previous order.
+- Preserve the existing ReportAdmin `formSort` / configured SKU row order for every account. The paper-slip PK lookup must not reorder items. Previously forced paper-slip sorting was reverted on 28 October 2026.
 - `Tools/order-pk.js` is a seed for 40 `[skuId, barcode, pk]` mappings transcribed from the October 2026 photo. Focus/NEW are **not** tracked as PK data. Seven other existing 7-ELEVEN SKUs have no confirmed PK in that slip and temporarily retain legacy 3; Admin marks them as `ยังไม่ยืนยัน`. Verify those before ordering.
 - Admin may override PK and product code per SKU via `Tools/ReportAdmin.html`; overrides are kept in `report_config_sets.items_json` without new schema or D1 migrations. Do not bulk-edit live data just to populate the seed.
 
-**Checks:** `node test/7eleven-report-compact.mjs`; syntax check embedded scripts. Local Chromium/Playwright tests for each repo passed at 360px: PK 4/6/12, check/uncheck/recheck, arbitrary quantity 8, reject below PK, preserve saved quantity 9, paper order, no row gap, account switching, and the Admin PK edit with a mocked API. Tests did not alter live store data.
+**Checks:** `node test/7eleven-report-compact.mjs`; syntax check embedded scripts. Local Chromium/Playwright tests for each repo passed at 360px: PK 4/6/12, check/uncheck/recheck, arbitrary quantity 8, reject below PK, preserve saved quantity 9, preserved configured SKU order, no row gap, account switching, and the Admin PK edit with a mocked API. Tests did not alter live store data.
 
 **Backup:** `C:\Project_winsurf\_backups\report-compact-pk-2026-10-28\{CVS,CVS_SME}`.
