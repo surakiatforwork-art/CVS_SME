@@ -36,6 +36,13 @@ assert.ok(html.indexOf('data-role="order-quantity" hidden') < html.indexOf('data
 assert.match(html,/class="skuOrderExpand"/);
 assert.match(html,/is-order-expanded/);
 assert.match(html,/toggleOrderQuantityDetails/);
+assert.match(html,/function collapseOrderQuantityRow\(/);
+assert.match(html,/function collapseOtherOrderQuantities\(/);
+assert.match(html,/function commitPendingOrderQuantity\(/);
+assert.match(html,/document\.addEventListener\("pointerdown"/);
+assert.match(html,/expanded\.contains\(event\.target\)/);
+assert.match(html,/collapseOtherOrderQuantities\(\);/);
+
 
 assert.match(html,/function renderSkuLists\(\)/);
 assert.match(html,/for \(const item of SKU_ITEMS\)/);

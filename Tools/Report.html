@@ -2969,15 +2969,48 @@
     updatePreview();
   }
 
+  function commitPendingOrderQuantity(row){
+    const input = row?.querySelector('[data-role="order-input"]');
+    if (!input || input.hidden || input.disabled) return;
+    // pointerdown (capture) precedes blur/change. Persist an in-progress edit
+    // before collapsing, otherwise setOrderQuantityForRow would restore the old value.
+    if (String(input.value).trim() !== String(row.dataset.orderQuantity || "0")){
+      changeOrderInput(input);
+    }
+  }
+
+  function collapseOrderQuantityRow(row){
+    const wrapper = row?.querySelector('[data-role="order-step"]');
+    if (!wrapper?.classList.contains("is-order-expanded")) return;
+    commitPendingOrderQuantity(row);
+    wrapper.classList.remove("is-order-expanded");
+    setOrderQuantityForRow(row, row.dataset.orderQuantity);
+  }
+
+  function collapseOtherOrderQuantities(exceptRow = null){
+    // Report popup is a single-open disclosure: switching SKU always closes
+    // the previously expanded quantity control without deleting its amount.
+    for (const wrapper of skuBoard.querySelectorAll('.skuOrderChoice.is-order-expanded')){
+      const row = wrapper.closest(".skuRow");
+      if (row && row !== exceptRow) collapseOrderQuantityRow(row);
+    }
+  }
+
   function toggleOrderQuantityDetails(target){
     const row = target.closest(".skuRow");
     if (!row || safeText(account.value).trim().toUpperCase() !== "7-ELEVEN") return;
     if (getRowFlag(row) === MONTHLY_FLAG_SKIP) return;
     if (!row.querySelector('[data-role="order-check"]')?.checked) return;
     const wrapper = row.querySelector('[data-role="order-step"]');
-    wrapper?.classList.toggle("is-order-expanded");
-    setOrderQuantityForRow(row, row.dataset.orderQuantity);
-    // Do not save the open/closed state; only the order quantity is persistent.
+    if (!wrapper) return;
+    if (wrapper.classList.contains("is-order-expanded")){
+      collapseOrderQuantityRow(row);
+    } else {
+      collapseOtherOrderQuantities(row);
+      wrapper.classList.add("is-order-expanded");
+      setOrderQuantityForRow(row, row.dataset.orderQuantity);
+    }
+    // Disclosure state is UI-only; orderQuantities persists independently.
   }
 
   function changeOrderStep(target){
@@ -3054,6 +3087,16 @@
       changeOrderStep(target);
     }
   });
+
+  // Tapping anywhere outside the open order control collapses it.
+  // The capture handler commits a still-focused input before it becomes hidden.
+  // It does not cancel the user's actual click (SAVE, COPY, another checkbox).
+  document.addEventListener("pointerdown", (event) => {
+    const expanded = skuBoard.querySelector('.skuOrderChoice.is-order-expanded');
+    if (!expanded) return;
+    if (event.target instanceof Node && expanded.contains(event.target)) return;
+    collapseOtherOrderQuantities();
+  }, true);
 
   btnCopy.addEventListener("click", () => doCopy({ openLine: true }));
   btnCopyOnly.addEventListener("click", () => doCopy({ openLine: false }));
