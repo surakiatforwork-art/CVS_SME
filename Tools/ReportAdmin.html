@@ -161,16 +161,22 @@
       if(USE_WORKER){
         if(local){status('กำลังบันทึก draft ลง D1...');await storePendingReportDraft()}
         status('กำลัง Sync ทั้งระบบระหว่าง D1 และ Google Sheets...');
-        const result=await ADMIN_CLIENT.syncNow(false);
+        // Explicit admin Sync must reconcile now, not take the fingerprint shortcut.
+        const result=await ADMIN_CLIENT.syncNow(true);
         await refreshSyncHistory();
         const pushed=Number(result.outbound?.processed||0);
         const changed=Number(result.inbound?.storesChanged||0);
         const pending=Number(result.pending||0);
         const conflicts=Number(result.conflicts||0);
+        const checkedTeams=Number(result.inbound?.teamsReconciled||0);
+        const incomplete=pending>0||conflicts>0;
         status(
-          'Sync สำเร็จ · ส่งไป Sheets '+pushed+' รายการ · ตรวจพบการเปลี่ยนแปลง '+changed+
-          ' รายการ · รอส่ง '+pending+' · Conflict '+conflicts,
-          conflicts>0 || pending>0
+          (incomplete?'Sync ยังไม่ครบ · ':'Sync ครบแล้ว · ')+
+          'ตรวจสอบ '+checkedTeams+' ทีม · ส่งไป Sheets '+pushed+
+          ' รายการ · ข้อมูลร้านที่เปลี่ยน '+changed+
+          ' · ค้างส่ง '+pending+' · รายการขัดแย้ง '+conflicts+
+          (conflicts>0?' (ต้องตรวจสอบและเลือกข้อมูลที่ถูกต้องก่อน)':''),
+          incomplete
         );
         return;
       }
