@@ -888,7 +888,7 @@ async function reconcileReportConfigConflicts(env) {
           "WHERE EXISTS(SELECT 1 FROM report_config_sets WHERE account=? AND version=?)"
         ).bind(row.account,requestId,JSON.stringify({
           items,sheetBaseVersion:sheetVersion,targetVersion:baseVersion,
-        }),now,now,row.account,baseVersion),
+        }),now,now,now,row.account,baseVersion),
         audit("d1",baseVersion),
       ]);
       if(Number(result[1]?.meta?.changes||0)===1){resolved++;projected++;}
