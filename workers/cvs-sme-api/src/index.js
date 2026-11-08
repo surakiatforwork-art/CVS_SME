@@ -1065,6 +1065,27 @@ async function processOutbox(env, limit = 10, forceDue = false) {
             throw new Error(code);
           }
         } else {
+          // Do not acknowledge a projection until Sheets actually reads it back.
+          if (job.action === "saveReportConfigBulk") {
+            const verified = await bridgeCall(env,"getReportConfig",{account:job.account},"");
+            if (!verified || verified.ok !== true || !Array.isArray(verified.items)) {
+              throw new Error("SHEET_CONFIG_READBACK_FAILED");
+            }
+            if (!env.LEGACY_API_URL) {
+              if (String(verified.version || "") !== String(params.targetVersion || "")) {
+                throw new Error("SHEET_CONFIG_VERSION_MISMATCH");
+              }
+            } else {
+              const canonical = rows => JSON.stringify((rows||[]).map(item=>({
+                account:String(item.account||""),kind:String(item.kind||""),
+                id:String(item.id||""),sort:Number(item.sort||0),
+                active:item.active!==false,data:item.data??{},
+              })).sort((a,b)=>(a.kind+"|"+a.id).localeCompare(b.kind+"|"+b.id)));
+              if (canonical(verified.items) !== canonical(params.items)) {
+                throw new Error("SHEET_CONFIG_CONTENT_MISMATCH");
+              }
+            }
+          }
           await updateSheetShadow(env, job, params);
           await env.DB.prepare(
             "UPDATE sync_outbox SET status='done',last_error=NULL,updated_at=? WHERE id=?"
