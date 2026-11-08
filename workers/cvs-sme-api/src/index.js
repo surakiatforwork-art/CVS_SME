@@ -700,7 +700,7 @@ async function saveReportConfig(env, accountRaw, body, requestId, ctx) {
   const response = { ok: true, account, count: items.length, version: targetVersion };
 
   const current = await env.DB.prepare(
-    "SELECT version FROM report_config_sets WHERE account=?"
+    "SELECT version,sheet_version FROM report_config_sets WHERE account=?"
   ).bind(account).first();
   const currentVersion = current?.version || "";
   if (String(baseVersion) !== String(currentVersion)) {
@@ -728,7 +728,7 @@ async function saveReportConfig(env, accountRaw, body, requestId, ctx) {
        SELECT 'saveReportConfigBulk',?,?,?,'pending',0,?,?,?
        WHERE EXISTS(SELECT 1 FROM report_config_sets WHERE account=? AND version=?)`
     ).bind(account, "projection:" + requestId,
-      JSON.stringify({items, d1BaseVersion:baseVersion,targetVersion}), now, now, now, account, targetVersion),
+      JSON.stringify({items,d1BaseVersion:baseVersion,sheetBaseVersion:String(current?.sheet_version||""),targetVersion}), now, now, now, account, targetVersion),
     env.DB.prepare(
       `INSERT INTO audit_events(event_type,origin,account,request_id,payload_json,created_at)
        SELECT 'report_config','worker_api',?,?,?,?
@@ -795,6 +795,109 @@ async function resolveSimpleIdempotency(env, requestId, requestHash) {
   throw new HttpError(409, "IDEMPOTENCY_IN_PROGRESS", "Request is still being resolved");
 }
 
+
+async function reconcileReportConfigConflicts(env) {
+  // ReportConfig is currently one account-level document. Resolve using real
+  // edit timestamps, never the time a Sheet snapshot happened to be fetched.
+  const {results:rows=[]} = await env.DB.prepare(
+    "SELECT r.account,r.items_json,r.version,r.updated_at FROM report_config_sets r " +
+    "WHERE EXISTS (SELECT 1 FROM sync_outbox o WHERE o.account=r.account " +
+    "AND o.action='saveReportConfigBulk' AND o.status='dead')"
+  ).all();
+  let resolved=0,unresolved=0,projected=0;
+  for(const row of rows) {
+    // The legacy SME bridge exposes a numeric revision and omits per-item
+    // updatedAt, so automatic LWW without source timestamps is unsafe.
+    if(env.LEGACY_API_URL) {unresolved++;continue;}
+    const source=await bridgeCall(env,"getReportConfig",{account:row.account},"");
+    if(!source || source.ok!==true || !Array.isArray(source.items)) {
+      throw new Error("ReportConfig source read failed for "+row.account);
+    }
+    const sheetItems=source.items.map(item=>({
+      account:String(item.account||row.account),
+      kind:String(item.kind||"").trim(),id:String(item.id||"").trim(),
+      sort:Number(item.sort||0),active:item.active!==false,
+      data:item.data??{},updatedAt:String(item.updatedAt||""),
+    })).filter(item=>item.kind&&item.id)
+      .sort((a,b)=>a.sort-b.sort||a.id.localeCompare(b.id));
+    const sheetVersion=await hashVersion(JSON.stringify(sheetItems));
+    if(sheetVersion!==String(source.version||"")) {
+      unresolved++;continue;
+    }
+    const baseVersion=String(row.version||"");
+    const now=new Date().toISOString();
+    const ack=(reason,expected)=>env.DB.prepare(
+      "UPDATE sync_outbox SET status='done',last_error=?,updated_at=? " +
+      "WHERE account=? AND action='saveReportConfigBulk' " +
+      "AND status IN ('dead','pending','error') " +
+      "AND EXISTS(SELECT 1 FROM report_config_sets WHERE account=? AND version=?)"
+    ).bind(reason,now,row.account,row.account,expected);
+    const audit=(winner,expected)=>env.DB.prepare(
+      "INSERT INTO audit_events(event_type,origin,account,payload_json,created_at) " +
+      "SELECT 'report_config_lww','sync_reconcile',?,?,? WHERE EXISTS" +
+      "(SELECT 1 FROM report_config_sets WHERE account=? AND version=?)"
+    ).bind(row.account,JSON.stringify({
+      account:row.account,winner,d1Version:baseVersion,sheetVersion,
+      d1ChangedAt:row.updated_at,
+      sheetChangedAt:sheetItems.map(i=>i.updatedAt).sort().at(-1)||"",
+    }),now,row.account,expected);
+    if(sheetVersion===baseVersion) {
+      const result=await env.DB.batch([
+        env.DB.prepare(
+          "UPDATE report_config_sets SET sheet_version=? WHERE account=? AND version=?"
+        ).bind(sheetVersion,row.account,baseVersion),
+        ack("LWW_ALREADY_MATCHED",baseVersion),
+        audit("equal",baseVersion),
+      ]);
+      if(Number(result[0]?.meta?.changes||0)===1)resolved++;
+      else unresolved++;
+      continue;
+    }
+    const d1Time=Date.parse(String(row.updated_at||""));
+    const sheetTimes=sheetItems.map(i=>Date.parse(String(i.updatedAt||"")))
+      .filter(t=>Number.isFinite(t)&&t>0&&t<=Date.now()+60000);
+    const sheetTime=sheetTimes.length?Math.max(...sheetTimes):NaN;
+    if(!Number.isFinite(d1Time)||!Number.isFinite(sheetTime)||d1Time===sheetTime) {
+      unresolved++;continue;
+    }
+    if(sheetTime>d1Time) {
+      const result=await env.DB.batch([
+        env.DB.prepare(
+          "UPDATE report_config_sets SET items_json=?,version=?,sheet_version=?,updated_at=? " +
+          "WHERE account=? AND version=?"
+        ).bind(JSON.stringify(sheetItems),sheetVersion,sheetVersion,
+          new Date(sheetTime).toISOString(),row.account,baseVersion),
+        ack("LWW_SHEETS_NEWER",sheetVersion),
+        audit("sheets",sheetVersion),
+      ]);
+      if(Number(result[0]?.meta?.changes||0)===1)resolved++;
+      else unresolved++;
+    }else{
+      // D1 is newer: enqueue fresh CAS projection against CURRENT Sheet version.
+      // Do not replay old dead payloads; preserve them as resolved history.
+      const requestId="projection:lww:"+crypto.randomUUID();
+      let items;
+      try{items=JSON.parse(row.items_json||"[]");}catch{unresolved++;continue;}
+      if(!Array.isArray(items)||!items.length){unresolved++;continue;}
+      const result=await env.DB.batch([
+        ack("LWW_D1_NEWER",baseVersion),
+        env.DB.prepare(
+          "INSERT INTO sync_outbox " +
+          "(action,account,request_id,payload_json,status,attempt_count,next_attempt_at,created_at,updated_at) " +
+          "SELECT 'saveReportConfigBulk',?,?,?,'pending',0,?,?,? " +
+          "WHERE EXISTS(SELECT 1 FROM report_config_sets WHERE account=? AND version=?)"
+        ).bind(row.account,requestId,JSON.stringify({
+          items,sheetBaseVersion:sheetVersion,targetVersion:baseVersion,
+        }),now,now,row.account,baseVersion),
+        audit("d1",baseVersion),
+      ]);
+      if(Number(result[1]?.meta?.changes||0)===1){resolved++;projected++;}
+      else unresolved++;
+    }
+  }
+  return {resolved,unresolved,projected};
+}
+
 async function runSyncCycle(env, trigger = "scheduled", force = false) {
   if (!env.DB || !bridgeConfigured_(env) || !env.SHEET_SYNC_SECRET) {
     return {ok:false,error:"SYNC_NOT_CONFIGURED"};
@@ -821,8 +924,21 @@ async function runSyncCycle(env, trigger = "scheduled", force = false) {
       if (!inbound || inbound.ok !== true) {
         throw new Error(inbound?.error || "SHEET_PULL_FAILED");
       }
+      const fixedBefore = await reconcileReportConfigConflicts(env);
       const outbound = await processOutbox(env, 100, trigger === "manual");
       if (outbound.busy || outbound.leaseLost) throw new Error("OUTBOX_LOCKED");
+      // A new CAS conflict may have been discovered during this same click.
+      const fixedAfter = await reconcileReportConfigConflicts(env);
+      if (fixedAfter.projected) {
+        const retry = await processOutbox(env, 100, trigger === "manual");
+        if (retry.busy || retry.leaseLost) throw new Error("OUTBOX_LOCKED");
+        outbound.processed = Number(outbound.processed || 0) + Number(retry.processed || 0);
+      }
+      const reportConfigLww = {
+        resolved:fixedBefore.resolved+fixedAfter.resolved,
+        unresolved:fixedAfter.unresolved,
+        projected:fixedBefore.projected+fixedAfter.projected,
+      };
       const {results: statuses = []} = await env.DB.prepare(
         "SELECT status,COUNT(*) AS n FROM sync_outbox WHERE status!='done' GROUP BY status"
       ).all();
@@ -837,6 +953,7 @@ async function runSyncCycle(env, trigger = "scheduled", force = false) {
         },outbound:{processed:Number(outbound.processed || 0)},
         pending:Number(counts.pending || 0)+Number(counts.error || 0),
         conflicts:Number(counts.dead || 0),
+        reportConfigLww,
       };
       await env.DB.prepare(
         "UPDATE sync_runs SET status='done',finished_at=?,summary_json=? WHERE id=?"
@@ -928,7 +1045,7 @@ async function processOutbox(env, limit = 10, forceDue = false) {
         params = {
           items: params.items || [],
           requestId: job.request_id,
-          baseVersion: params.d1BaseVersion || params.baseVersion || "",
+          baseVersion: params.sheetBaseVersion ?? params.d1BaseVersion ?? params.baseVersion ?? "",
           targetVersion: params.targetVersion || "",
         };
       }
@@ -1082,6 +1199,7 @@ async function legacyBridgeCall_(env, action, params, requestId) {
   }
 
   const query = {action};
+  if (params.account != null) query.account = params.account;
   if (params.sheet != null) query.sheet = params.sheet;
   if (params.id != null) query.id = params.id;
   if (action === "saveNoted") query.noted = params.noted ?? "";
@@ -2075,3 +2193,6 @@ function corsHeaders(origin) {
     "vary":"Origin",
   };
 }
+
+// Exported for synthetic sync regression tests, not exposed as an HTTP route.
+export { reconcileReportConfigConflicts };

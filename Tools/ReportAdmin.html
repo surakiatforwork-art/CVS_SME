@@ -53,7 +53,7 @@
   function showLoading(on){$('loadingHint').textContent=on?`กำลังโหลดข้อมูล ${account()}...`:'';$('loadingOverlay').classList.toggle('open',on)}
   function jsonp(action, params={}, timeoutMs=15000){return new Promise((resolve,reject)=>{const cb='__rc_'+Date.now()+'_'+Math.random().toString(36).slice(2);const url=new URL(API_URL);url.searchParams.set('action',action);url.searchParams.set('callback',cb);Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));const script=document.createElement('script');const timer=setTimeout(()=>done(new Error('หมดเวลารอ API')),timeoutMs);function done(err,val){clearTimeout(timer);delete window[cb];script.remove();err?reject(err):resolve(val)}window[cb]=v=>done(null,v);script.onerror=()=>done(new Error('เชื่อมต่อ API ไม่สำเร็จ'));script.src=url;document.head.appendChild(script);});}
   function account(){return $('account').value} function itemOrder(item){return kind==='sku'?(Number((item.data||{}).formSort)||item.sort):item.sort} function visible(){return items.filter(x=>x.kind===kind).sort((a,b)=>itemOrder(a)-itemOrder(b))} function labelForKind(){return kind==='sku'?'สินค้า':kind==='summary'?'หัวข้อสรุปท้ายงาน':'สื่อโปรโมชั่น'}
-  function includeBuiltin(){for(const [type,rows] of Object.entries(BUILTIN))for(const [id,label] of rows)if(!items.some(x=>x.kind===type&&x.id===id))items.push({account:account(),kind:type,id,sort:rows.findIndex(x=>x[0]===id)+1,active:true,data:{label},builtin:true})}
+  function includeBuiltin(){if(items.length)return;for(const [type,rows] of Object.entries(BUILTIN))for(const [id,label] of rows)if(!items.some(x=>x.kind===type&&x.id===id))items.push({account:account(),kind:type,id,sort:rows.findIndex(x=>x[0]===id)+1,active:true,data:{label},builtin:true})}
   function persist(){items=items.map((item)=>({...item,account:account()}));drafts[account()]={items,updatedAt:Date.now(),requestId:drafts[account()]?.requestId||''};localStorage.setItem(STORE,JSON.stringify(drafts));status('บันทึกในเครื่องแล้ว · รอ Sync')}
   async function load(force=false){
     const currentAccount=account(),local=drafts[currentAccount];
@@ -76,13 +76,13 @@
   function startDrag(event){if(!reordering||event.button!==0)return;const handle=event.target.closest('[data-drag]');if(!handle)return;const source=handle.closest('.item');if(!source)return;event.preventDefault();const rect=source.getBoundingClientRect(),ghost=source.cloneNode(true);ghost.className='dragGhost';ghost.style.setProperty('--drag-width',`${rect.width}px`);ghost.style.left=`${rect.left}px`;ghost.style.top=`${event.clientY}px`;document.body.appendChild(ghost);dragState={pointerId:event.pointerId,source,ghost};try{handle.setPointerCapture(event.pointerId)}catch(_){}}
   function moveDrag(event){if(!dragState||event.pointerId!==dragState.pointerId)return;event.preventDefault();dragState.ghost.style.top=`${event.clientY}px`;if(event.clientY<80)window.scrollBy(0,-14);if(event.clientY>innerHeight-80)window.scrollBy(0,14);const others=[...$('list').querySelectorAll('.item')].filter(card=>card!==dragState.source);const before=others.find(card=>event.clientY<card.getBoundingClientRect().top+card.getBoundingClientRect().height/2);const currentNext=dragState.source.nextElementSibling;if(before!==currentNext&&before!==dragState.source)flipMove(dragState.source,before)}
   function endDrag(event){if(!dragState||event.pointerId!==dragState.pointerId)return;dragState.ghost.remove();dragState=null}
-  function applyDraggedOrder(){[...$('list').querySelectorAll('.item')].forEach((card,index)=>{const item=items.find(row=>row.kind===kind&&row.id===card.dataset.id);if(!item)return;if(kind==='sku'){item.data=item.data||{};item.data.formSort=index+1}else item.sort=index+1})}
+  function applyDraggedOrder(){const changedAt=new Date().toISOString();[...$('list').querySelectorAll('.item')].forEach((card,index)=>{const item=items.find(row=>row.kind===kind&&row.id===card.dataset.id);if(!item)return;item.updatedAt=changedAt;if(kind==='sku'){item.data=item.data||{};item.data.formSort=index+1}else item.sort=index+1})}
   function endActiveDrag(){if(!dragState)return;dragState.ghost.remove();dragState=null}
   async function toggleReorder(){if(!reordering){reorderSnapshot=new Map(visible().map(item=>[item.id,itemOrder(item)]));setReorderMode(true);setToolsOpen(true);status('ลากจากไอคอนหกจุดไปวางตำแหน่งใหม่ แล้วกด “เสร็จสิ้น”');return}if(dragState)return;applyDraggedOrder();reorderSnapshot=null;setReorderMode(false);persist();await saveOnly()}
   function cancelReorder(){endActiveDrag();if(reorderSnapshot){items.filter(item=>item.kind===kind).forEach(item=>{const order=reorderSnapshot.get(item.id);if(order===undefined)return;if(kind==='sku'){item.data=item.data||{};item.data.formSort=order}else item.sort=order})}reorderSnapshot=null;setReorderMode(false);setToolsOpen(false);status('ยกเลิกการจัดเรียงแล้ว')}
   function open(item){editing=item||null;const d=item?.data||{},isSku=kind==='sku',nextSort=Math.max(0,...items.map(x=>x.sort||0))+10,nextFormSort=Math.max(0,...items.filter(x=>x.kind==='sku').map(x=>Number((x.data||{}).formSort)||x.sort||0))+10;$('formTitle').textContent=item?'แก้ไขรายการ':'เพิ่ม '+labelForKind();$('label').value=d.label||'';$('family').value=d.family||'SME';$('category').value=SKU_CATEGORIES.includes(d.category)?d.category:'';$('category').disabled=!isSku;$('formSort').value=d.formSort??(item?.sort??nextFormSort);$('formSort').disabled=!isSku;$('defaultFlag').value=d.defaultFlag||'';const orderMeta=PTOrderPkCatalog.resolve(item?.id,d);$('barcode').value=d.barcode||orderMeta.barcode;$('pk').value=d.pk||orderMeta.pk;$('sort').value=item?.sort??nextSort;$('sort').disabled=isSku;$('remove').style.display=item?'block':'none';['familyWrap','categoryWrap','formSortWrap','flagWrap'].forEach(id=>$(id).style.display=isSku?'block':'none');['barcodeWrap','pkWrap'].forEach(id=>$(id).style.display=isSku&&account()==='7-ELEVEN'?'block':'none');$('sortWrap').style.display=isSku?'none':'block';$('modal').classList.add('open')}
   function close(){ $('modal').classList.remove('open') } function makeId(){return `${kind}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,7)}`}
-  async function save(item){item.account=account();const index=items.findIndex(x=>x.kind===item.kind&&x.id===item.id);if(index<0)items.push(item);else items[index]=item;persist()}
+  async function save(item){item.account=account();item.updatedAt=new Date().toISOString();const index=items.findIndex(x=>x.kind===item.kind&&x.id===item.id);if(index<0)items.push(item);else items[index]=item;persist()}
   function sameConfig(remote, local){const key=x=>`${x.kind}:${x.id}`;const left=[...remote].sort((a,b)=>key(a).localeCompare(key(b)));const right=[...local].sort((a,b)=>key(a).localeCompare(key(b)));return left.length===right.length&&left.every((item,index)=>key(item)===key(right[index])&&item.sort===right[index].sort&&(item.active!==false)===(right[index].active!==false)&&JSON.stringify(item.data||{})===JSON.stringify(right[index].data||{}))}
   function makeRequestId(){return `rc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`}
   async function refreshSyncHistory(){
@@ -99,11 +99,12 @@
         let summary={};try{summary=JSON.parse(row.summary_json||'{}')}catch(_){}
         line.textContent=time+' · '+row.trigger+' · '+row.status+
           (row.status==='done'?' · ส่ง '+Number(summary.outbound?.processed||0)+
-          ' · ค้าง '+Number(summary.pending||0)+' · LWW '+Number(summary.inbound?.lwwResolved||0):'')+
+          ' · ค้าง '+Number(summary.pending||0)+' · LWW ร้าน '+Number(summary.inbound?.lwwResolved||0)+
+          ' · LWW รายงาน '+Number(summary.reportConfigLww?.resolved||0):'')+
           (row.error?' · '+row.error:'');
         el.appendChild(line);
       }
-      const unresolved=(data.conflicts||[]).filter(job=>job.last_error==='CONCURRENT_SHEET_EDIT');
+      const unresolved=(data.conflicts||[]);
       if(unresolved.length){
         const warning=document.createElement('div');
         warning.style.color='var(--danger)';
@@ -159,7 +160,12 @@
     syncing=true;setFabSyncing(true);
     try{
       if(USE_WORKER){
-        if(local){status('กำลังบันทึก draft ลง D1...');await storePendingReportDraft()}
+        let draftSaveFailure='';
+        if(local){
+          status('กำลังบันทึก draft ลง D1...');
+          try{await storePendingReportDraft()}
+          catch(e){draftSaveFailure=e.message||'ไม่ทราบสาเหตุ';console.error('Pending draft save failed',e)}
+        }
         status('กำลัง Sync ทั้งระบบระหว่าง D1 และ Google Sheets...');
         // Explicit admin Sync must reconcile now, not take the fingerprint shortcut.
         const result=await ADMIN_CLIENT.syncNow(true);
@@ -169,13 +175,17 @@
         const pending=Number(result.pending||0);
         const conflicts=Number(result.conflicts||0);
         const checkedTeams=Number(result.inbound?.teamsReconciled||0);
-        const incomplete=pending>0||conflicts>0;
+        const resolved=Number(result.reportConfigLww?.resolved||0);
+        const unresolved=Number(result.reportConfigLww?.unresolved||0);
+        const incomplete=pending>0||conflicts>0||unresolved>0||Boolean(draftSaveFailure);
         status(
           (incomplete?'Sync ยังไม่ครบ · ':'Sync ครบแล้ว · ')+
           'ตรวจสอบ '+checkedTeams+' ทีม · ส่งไป Sheets '+pushed+
           ' รายการ · ข้อมูลร้านที่เปลี่ยน '+changed+
+          ' · แก้ Conflict อัตโนมัติ '+resolved+
           ' · ค้างส่ง '+pending+' · รายการขัดแย้ง '+conflicts+
-          (conflicts>0?' (ต้องตรวจสอบและเลือกข้อมูลที่ถูกต้องก่อน)':''),
+          (unresolved?' · ไม่มีหลักฐานเวลาพอ '+unresolved:'')+
+          (draftSaveFailure?' · Draft ในเครื่องยังไม่ได้บันทึก: '+draftSaveFailure:''),
           incomplete
         );
         return;
